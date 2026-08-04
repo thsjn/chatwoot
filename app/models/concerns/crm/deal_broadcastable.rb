@@ -6,6 +6,9 @@
 # a card (the API, `Crm::IngestConversationService`, a console fix) reaches the open boards.
 module Crm::DealBroadcastable
   extend ActiveSupport::Concern
+  # The event name constants live in `Events::Types`; without including it the dispatch raises
+  # NameError at runtime, which no unit test of the payload would catch.
+  include Events::Types
 
   # Columns of the realtime card, sliced straight off `attributes` so the payload stays the shape
   # the board already knows from the jbuilder partial.
