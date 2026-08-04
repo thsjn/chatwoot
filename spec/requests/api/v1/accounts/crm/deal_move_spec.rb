@@ -60,6 +60,10 @@ RSpec.describe 'CRM Deal move API', type: :request do
     end
 
     it 'creates the transition with the duration spent on the previous stage' do
+      # Force the deal (and its own creation transition) to exist before the measured block,
+      # so the `by(1)` below reflects only the transition written by the move itself.
+      deal
+
       expect do
         patch move_url, params: { stage_id: destination_stage.id, lock_version: deal.lock_version },
                         headers: admin.create_new_auth_token, as: :json
@@ -249,6 +253,10 @@ RSpec.describe 'CRM Deal move API', type: :request do
 
   describe 'reordering inside the same stage' do
     it 'does not create a stage transition' do
+      # Force the deal (and its own creation transition) to exist before the measured block,
+      # so a plain reorder is the only thing being asserted against.
+      deal
+
       expect do
         patch move_url, params: { stage_id: origin_stage.id, position: 2000, lock_version: deal.lock_version },
                         headers: admin.create_new_auth_token, as: :json

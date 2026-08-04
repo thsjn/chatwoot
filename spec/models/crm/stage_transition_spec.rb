@@ -61,11 +61,14 @@ RSpec.describe Crm::StageTransition do
 
   describe 'scopes' do
     it 'splits transitions between automated and manual' do
+      # Instantiating `deal` already wrote its own creation transition (`automated: false`,
+      # see `Crm::Deal#record_creation_transition`), so it belongs in the `manual` scope too.
+      creation_transition = deal.stage_transitions.sole
       automated = create(:crm_stage_transition, :by_automation, deal: deal, to_stage: to_stage)
       manual = create(:crm_stage_transition, deal: deal, to_stage: to_stage)
 
       expect(described_class.automated).to contain_exactly(automated)
-      expect(described_class.manual).to contain_exactly(manual)
+      expect(described_class.manual).to contain_exactly(creation_transition, manual)
     end
   end
 end
