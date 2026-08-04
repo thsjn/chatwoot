@@ -6,6 +6,7 @@ import CrmSettingsPipelines from './settings/PipelinesIndex.vue';
 import CrmSettingsStages from './settings/StagesIndex.vue';
 import CrmSettingsSources from './settings/SourcesIndex.vue';
 import CrmSettingsLostReasons from './settings/LostReasonsIndex.vue';
+import { crmModuleGuard } from './crmModuleGate';
 
 // The funnel configuration is administrator only on the backend (`Crm::PipelinePolicy`,
 // `Crm::StagePolicy`, `Crm::SourcePolicy`, `Crm::LostReasonPolicy` all gate create/update/destroy
@@ -13,11 +14,15 @@ import CrmSettingsLostReasons from './settings/LostReasonsIndex.vue';
 // reach a screen whose every button answers 401.
 const ADMIN_ONLY = { permissions: ['administrator'] };
 
+// The module itself is opt-in per account (`settings.crm_kanban`). `beforeEnter` on the three
+// top-level entries covers the whole tree — the settings children are only reachable through their
+// parent — so a disabled account cannot land on the board, the reports or the administration.
 export const routes = [
   {
     path: frontendURL('accounts/:accountId/crm'),
     component: CrmBoardIndex,
     name: 'crm_board',
+    beforeEnter: crmModuleGuard,
     meta: {
       permissions: ['administrator', 'agent', 'custom_role'],
     },
@@ -26,6 +31,7 @@ export const routes = [
     path: frontendURL('accounts/:accountId/crm/reports'),
     component: CrmReportsIndex,
     name: 'crm_reports',
+    beforeEnter: crmModuleGuard,
     // `Crm::ReportPolicy` opens the metrics to agents too: an agent has to see
     // where their own deals stall, and a pipeline restricted by owner already
     // limits the aggregates to the deals they can see on the board.
@@ -36,6 +42,7 @@ export const routes = [
   {
     path: frontendURL('accounts/:accountId/crm/settings'),
     component: CrmSettingsIndex,
+    beforeEnter: crmModuleGuard,
     meta: ADMIN_ONLY,
     children: [
       {

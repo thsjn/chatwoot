@@ -21,7 +21,7 @@ RSpec.describe Crm::PipelinePolicy, type: :policy do
     end
   end
 
-  permissions :create?, :update?, :destroy? do
+  permissions :create?, :update?, :destroy?, :archive?, :unarchive? do
     it 'allows administrators' do
       expect(subject).to permit(administrator_context, pipeline)
     end

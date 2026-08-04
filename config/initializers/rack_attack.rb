@@ -236,6 +236,24 @@ class Rack::Attack
     match_data[:account_id] if match_data.present?
   end
 
+  ## Prevent lead bombing on the public CRM ingestion endpoint (per source) ##
+  #
+  # The endpoint is unauthenticated in the session sense: the caller is a `Crm::Source` token. The
+  # throttle is keyed by the account plus the DIGEST of the presented token, so each credential gets
+  # its own budget (one noisy landing page cannot starve the n8n flow next to it) and the plain token
+  # never reaches the Rack::Attack cache. Requests with no token share a bucket per account, which is
+  # what caps a brute force of the credential itself.
+  throttle('/public/api/v1/accounts/:account_id/crm/leads',
+           limit: ENV.fetch('RATE_LIMIT_CRM_LEAD_INGESTION', '60').to_i, period: 1.minute) do |req|
+    next unless req.post?
+
+    match_data = %r{\A/public/api/v1/accounts/(?<account_id>\d+)/crm/leads/?\z}.match(req.path_without_extensions)
+    next if match_data.blank?
+
+    token = req.get_header('HTTP_X_CRM_SOURCE_TOKEN').presence || req.get_header('HTTP_AUTHORIZATION').to_s[/\ABearer (.+)\z/, 1]
+    "#{match_data[:account_id]}:#{Digest::SHA256.hexdigest(token.to_s)}"
+  end
+
   ## Prevent Abuse of attachment upload APIs ##
   throttle('/api/v1/accounts/:account_id/upload', limit: 60, period: 1.hour) do |req|
     match_data = %r{/api/v1/accounts/(?<account_id>\d+)/upload}.match(req.path)

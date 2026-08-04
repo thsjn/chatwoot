@@ -607,8 +607,15 @@ pt_BR:
   automation:
     system_name: 'Sistema de Automação'
   crm:
+    module_disabled: 'Recurso não encontrado'
     deal:
       default_title: 'Contato #%{id}'
+    lead_ingestion:
+      invalid_token: 'Token de origem inválido ou inativo'
+      contact_required: 'Informe um e-mail ou um telefone para identificar o contato'
+      pipeline_not_found: 'Nenhum funil ativo disponível para este lead'
+      pipeline_without_stages: 'O funil não possui etapas para receber o lead'
+      source_without_inbox: 'Esta origem não tem caixa de entrada vinculada, então o contato não pode ser criado'
     no_message: 'Nenhuma mensagem na conversa'
     attachment: '[Anexo: %{type}]'
     no_content: '[Sem conteúdo]'

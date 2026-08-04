@@ -16,6 +16,7 @@ import {
   BaseTableCell,
 } from 'dashboard/components-next/table';
 import SourceDialog from './components/SourceDialog.vue';
+import SourceTokenDialog from './components/SourceTokenDialog.vue';
 
 const { t } = useI18n();
 const store = useStore();
@@ -24,6 +25,7 @@ const settingsStore = useCrmSettingsStore();
 const inboxes = useMapGetter('inboxes/getInboxes');
 
 const dialogRef = ref(null);
+const tokenDialogRef = ref(null);
 
 const sources = computed(() => settingsStore.getSources);
 const uiFlags = computed(() => settingsStore.getUIFlags);
@@ -32,9 +34,16 @@ const tableHeaders = computed(() => [
   t('CRM.SETTINGS.SOURCES.TABLE.NAME'),
   t('CRM.SETTINGS.SOURCES.TABLE.KIND'),
   t('CRM.SETTINGS.SOURCES.TABLE.INBOX'),
+  t('CRM.SETTINGS.SOURCES.TABLE.TOKEN'),
   t('CRM.SETTINGS.SOURCES.TABLE.ACTIVE'),
   t('CRM.SETTINGS.SOURCES.TABLE.ACTION'),
 ]);
+
+// Only the kinds that stand for something OUTSIDE Chatwoot can be credentialed: an `inbox` source
+// is fed by the conversation ingestion and an `import`/`manual` one by a person, so neither has
+// anything to authenticate.
+const isCredentialable = source =>
+  ['landing', 'api', 'n8n'].includes(source.kind);
 
 const inboxName = source =>
   inboxes.value.find(inbox => inbox.id === source.inbox_id)?.name || '—';
@@ -110,6 +119,20 @@ onMounted(() => {
               </BaseTableCell>
 
               <BaseTableCell>
+                <span class="text-body-main text-n-slate-11">
+                  {{
+                    isCredentialable(source)
+                      ? t(
+                          source.has_token
+                            ? 'CRM.SETTINGS.SOURCES.TOKEN.STATUS_SET'
+                            : 'CRM.SETTINGS.SOURCES.TOKEN.STATUS_NONE'
+                        )
+                      : '—'
+                  }}
+                </span>
+              </BaseTableCell>
+
+              <BaseTableCell>
                 <Switch
                   :model-value="source.active"
                   @change="toggleActive(source)"
@@ -117,13 +140,23 @@ onMounted(() => {
               </BaseTableCell>
 
               <BaseTableCell align="end">
-                <Button
-                  v-tooltip.top="t('CRM.SETTINGS.EDIT')"
-                  slate
-                  sm
-                  icon="i-woot-edit-pen"
-                  @click="dialogRef?.open(source)"
-                />
+                <div class="flex justify-end flex-shrink-0 gap-3">
+                  <Button
+                    v-if="isCredentialable(source)"
+                    v-tooltip.top="t('CRM.SETTINGS.SOURCES.TOKEN.MANAGE')"
+                    slate
+                    sm
+                    icon="i-lucide-key-round"
+                    @click="tokenDialogRef?.open(source)"
+                  />
+                  <Button
+                    v-tooltip.top="t('CRM.SETTINGS.EDIT')"
+                    slate
+                    sm
+                    icon="i-woot-edit-pen"
+                    @click="dialogRef?.open(source)"
+                  />
+                </div>
               </BaseTableCell>
             </template>
           </BaseTableRow>
@@ -132,5 +165,6 @@ onMounted(() => {
     </template>
 
     <SourceDialog ref="dialogRef" />
+    <SourceTokenDialog ref="tokenDialogRef" />
   </SettingsLayout>
 </template>

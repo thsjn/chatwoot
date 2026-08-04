@@ -412,6 +412,24 @@ RSpec.describe Account do
       end
     end
 
+    context 'when reading the crm_kanban toggle' do
+      it 'is off for an account that never enabled the module' do
+        account.settings = {}
+
+        expect(account.crm_kanban?).to be false
+      end
+
+      # `settings` can be written wholesale (seeds, console, another store_accessor), which bypasses
+      # the casting writer, so the predicate has to cast on read too.
+      it 'casts a value written straight into settings' do
+        account.settings = { 'crm_kanban' => 'true' }
+        expect(account.crm_kanban?).to be true
+
+        account.settings = { 'crm_kanban' => 'false' }
+        expect(account.crm_kanban?).to be false
+      end
+    end
+
     context 'when using with_auto_resolve scope' do
       it 'finds accounts with auto_resolve_after set' do
         account.update!(auto_resolve_after: 40 * 24 * 60)

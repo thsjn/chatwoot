@@ -231,4 +231,74 @@ RSpec.describe 'CRM Sources API', type: :request do
       end
     end
   end
+
+  describe 'POST /api/v1/accounts/{account.id}/crm/sources/:id/regenerate_token' do
+    context 'when unauthenticated' do
+      it 'returns unauthorized and does not credential the source' do
+        expect do
+          post "/api/v1/accounts/#{account.id}/crm/sources/#{source.id}/regenerate_token"
+        end.not_to(change { source.reload.token_digest })
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when the user is an agent' do
+      it 'is not allowed to mint credentials' do
+        post "/api/v1/accounts/#{account.id}/crm/sources/#{source.id}/regenerate_token",
+             headers: agent.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when the user is an administrator' do
+      let!(:source) { create(:crm_source, account: account, kind: :api, name: 'n8n') }
+
+      it 'returns the plain token exactly once and stores only its digest' do
+        post "/api/v1/accounts/#{account.id}/crm/sources/#{source.id}/regenerate_token",
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:success)
+        token = response.parsed_body['token']
+        expect(token).to be_present
+        expect(source.reload.token_digest).to eq(Digest::SHA256.hexdigest(token))
+
+        # Every other endpoint of the resource must stay silent about it.
+        get "/api/v1/accounts/#{account.id}/crm/sources/#{source.id}",
+            headers: admin.create_new_auth_token, as: :json
+
+        expect(response.parsed_body).not_to have_key('token')
+        expect(response.parsed_body['has_token']).to be(true)
+      end
+
+      it 'tells the integrator where to post the leads' do
+        post "/api/v1/accounts/#{account.id}/crm/sources/#{source.id}/regenerate_token",
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(response.parsed_body['ingestion_url']).to end_with("/public/api/v1/accounts/#{account.id}/crm/leads")
+      end
+
+      it 'changes the digest on a second call' do
+        post "/api/v1/accounts/#{account.id}/crm/sources/#{source.id}/regenerate_token",
+             headers: admin.create_new_auth_token, as: :json
+        first_digest = source.reload.token_digest
+
+        post "/api/v1/accounts/#{account.id}/crm/sources/#{source.id}/regenerate_token",
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(source.reload.token_digest).not_to eq(first_digest)
+      end
+
+      it 'returns not found for a source of another account' do
+        foreign_source = create(:crm_source, account: other_account)
+
+        post "/api/v1/accounts/#{account.id}/crm/sources/#{foreign_source.id}/regenerate_token",
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:not_found)
+        expect(foreign_source.reload.token_digest).to be_nil
+      end
+    end
+  end
 end

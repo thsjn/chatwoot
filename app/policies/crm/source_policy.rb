@@ -19,4 +19,10 @@ class Crm::SourcePolicy < ApplicationPolicy
   def destroy?
     @account_user.administrator?
   end
+
+  # Minting the token is handing out a credential that writes into the funnel from outside the
+  # product, so it never reaches an agent.
+  def regenerate_token?
+    @account_user.administrator?
+  end
 end

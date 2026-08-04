@@ -65,6 +65,14 @@ class Account < ApplicationRecord
     super(ActiveModel::Type::Boolean.new.cast(value))
   end
 
+  # Single answer to "is the CRM module on for this account?", read by the controller gate
+  # (`Crm::ModuleEnabled`), by the ingestion service and by the deal broadcast. The cast is redone
+  # on read because `settings` can be written wholesale (`account.settings = { ... }`, seeds,
+  # console), which bypasses the casting writer above and can leave a string in the column.
+  def crm_kanban?
+    ActiveModel::Type::Boolean.new.cast(crm_kanban).present?
+  end
+
   include AccountAgentRestrictions
   include AccountCaptainAutoResolve
 

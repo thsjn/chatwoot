@@ -12,6 +12,18 @@ RSpec.describe Crm::Deal do
     # stage created along the way publishes its own events and must not fail the example.
     before { allow(Rails.configuration.dispatcher).to receive(:dispatch).and_call_original }
 
+    context 'when the account has the CRM module disabled' do
+      let(:account) { create(:account, crm_kanban: false) }
+
+      it 'does not publish card events' do
+        deal = create(:crm_deal, account: account, pipeline: pipeline, stage: stage, contact: contact)
+        deal.update!(title: 'Fazenda Santa Clara')
+        deal.archive!
+
+        expect(Rails.configuration.dispatcher).not_to have_received(:dispatch).with(/\Acrm_deal\./, anything, deal: deal)
+      end
+    end
+
     it 'dispatches crm_deal.created when a card enters the board' do
       deal = create(:crm_deal, account: account, pipeline: pipeline, stage: stage, contact: contact)
 

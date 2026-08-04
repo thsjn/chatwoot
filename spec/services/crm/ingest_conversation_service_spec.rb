@@ -14,6 +14,25 @@ describe Crm::IngestConversationService do
   let(:conversation) { create(:conversation, account: account, inbox: inbox, contact: contact) }
 
   describe '#perform' do
+    # Single gate of the asynchronous ingestion: `CrmListener` -> `Crm::IngestConversationJob` and
+    # `Crm::BackfillJob` both come through here, so this is what keeps a conversation from becoming
+    # a card while the account has the module off.
+    context 'when the account has the CRM module disabled' do
+      before { account.update!(crm_kanban: false) }
+
+      it 'does not create any deal' do
+        expect { described_class.new(conversation: conversation).perform }.not_to change(Crm::Deal, :count)
+      end
+
+      it 'does not link the conversation' do
+        expect { described_class.new(conversation: conversation).perform }.not_to change(Crm::DealConversation, :count)
+      end
+
+      it 'reports nothing ingested' do
+        expect(described_class.new(conversation: conversation).perform).to eq(created: 0, linked: 0)
+      end
+    end
+
     context 'when the pipeline has no inbox configured' do
       let(:pipeline) do
         create(:crm_pipeline, account: account, settings: { 'inbox_ids' => [], 'janela_dedupe_dias' => 30, 'moeda_padrao' => 'BRL' })

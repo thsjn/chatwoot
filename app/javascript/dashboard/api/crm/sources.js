@@ -19,6 +19,11 @@ class CrmSources extends ApiClient {
   update(id, data) {
     return axios.patch(`${this.url}/${id}`, { source: data });
   }
+
+  // The response is the only place the plain token ever exists: the backend keeps a digest of it.
+  regenerateToken(id) {
+    return axios.post(`${this.url}/${id}/regenerate_token`);
+  }
 }
 
 export default new CrmSources();

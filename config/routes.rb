@@ -191,6 +191,10 @@ Rails.application.routes.draw do
 
           namespace :crm do
             resources :pipelines, only: [:index, :show, :create, :update, :destroy] do
+              member do
+                post :archive
+                post :unarchive
+              end
               resources :stages, only: [:index, :show, :create, :update, :destroy]
             end
             resources :deals, only: [:index, :show, :create, :update, :destroy] do
@@ -198,7 +202,9 @@ Rails.application.routes.draw do
               patch :unarchive, on: :member
               resources :activities, only: [:index, :show, :create, :update, :destroy]
             end
-            resources :sources, only: [:index, :show, :create, :update, :destroy]
+            resources :sources, only: [:index, :show, :create, :update, :destroy] do
+              post :regenerate_token, on: :member
+            end
             resources :lost_reasons, only: [:index, :show, :create, :update, :destroy]
             resource :reports, only: [], controller: 'reports' do
               get :funnel
@@ -703,6 +709,17 @@ Rails.application.routes.draw do
         end
 
         resources :csat_survey, only: [:show, :update]
+
+        # External lead ingestion for the CRM. Authenticated by the token of a `Crm::Source`, never
+        # by a user session, and scoped to the account of the URL so a token of another account is
+        # rejected like an invalid one.
+        resources :accounts, only: [] do
+          scope module: :accounts do
+            namespace :crm do
+              resources :leads, only: [:create]
+            end
+          end
+        end
       end
     end
   end

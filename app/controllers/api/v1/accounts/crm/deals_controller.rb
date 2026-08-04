@@ -1,4 +1,4 @@
-class Api::V1::Accounts::Crm::DealsController < Api::V1::Accounts::BaseController
+class Api::V1::Accounts::Crm::DealsController < Api::V1::Accounts::Crm::BaseController
   include Crm::DealFilterable
 
   RESULTS_PER_PAGE = 25

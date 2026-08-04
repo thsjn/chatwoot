@@ -85,10 +85,12 @@ export const useCrmSettingsStore = defineStore('crmSettings', {
   actions: {
     // --- pipelines ----------------------------------------------------------------------
 
+    // `include_archived` is what separates this listing from the board one: a retired funnel has to
+    // stay visible here to be restored, while the board only ever offers the active ones.
     async fetchPipelines() {
       this.uiFlags.fetchingPipelines = true;
       try {
-        const { data } = await CrmPipelinesAPI.get();
+        const { data } = await CrmPipelinesAPI.get({ include_archived: true });
         this.pipelines = data.payload;
         return this.pipelines;
       } finally {
@@ -111,6 +113,28 @@ export const useCrmSettingsStore = defineStore('crmSettings', {
       this.uiFlags.isSaving = true;
       try {
         const { data } = await CrmPipelinesAPI.update(id, payload);
+        this.pipelines = this.pipelines.map(pipeline =>
+          pipeline.id === data.id ? data : pipeline
+        );
+        return data;
+      } finally {
+        this.uiFlags.isSaving = false;
+      }
+    },
+
+    /**
+     * Archiving is the way to retire a funnel that is in use: `delete` is refused while it holds
+     * deals, and the deals themselves are left untouched, so restoring brings the board back.
+     *
+     * @param {number} id Pipeline to retire.
+     * @param {boolean} archived Target state — false restores it.
+     */
+    async setPipelineArchived(id, archived) {
+      this.uiFlags.isSaving = true;
+      try {
+        const { data } = archived
+          ? await CrmPipelinesAPI.archive(id)
+          : await CrmPipelinesAPI.unarchive(id);
         this.pipelines = this.pipelines.map(pipeline =>
           pipeline.id === data.id ? data : pipeline
         );
@@ -236,6 +260,28 @@ export const useCrmSettingsStore = defineStore('crmSettings', {
           source.id === data.id ? data : source
         );
         return data;
+      } finally {
+        this.uiFlags.isSaving = false;
+      }
+    },
+
+    /**
+     * Mints the credential an external system uses to post leads. The plain token comes back once
+     * and is NOT kept in the store beyond what the caller does with it: the backend only stores a
+     * digest, so it can never be read again — only replaced.
+     *
+     * @param {number} id Source to credential.
+     * @returns {Promise<{token: string, ingestion_url: string}>} The one-time token and where to post.
+     */
+    async regenerateSourceToken(id) {
+      this.uiFlags.isSaving = true;
+      try {
+        const { data } = await CrmSourcesAPI.regenerateToken(id);
+        const { token, ingestion_url: ingestionUrl, ...source } = data;
+        this.sources = this.sources.map(item =>
+          item.id === source.id ? { ...item, ...source } : item
+        );
+        return { token, ingestionUrl };
       } finally {
         this.uiFlags.isSaving = false;
       }

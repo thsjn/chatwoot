@@ -63,11 +63,19 @@ module Crm::DealBroadcastable
   end
 
   def dispatch_create_event
-    Rails.configuration.dispatcher.dispatch(CRM_DEAL_CREATED, Time.zone.now, deal: self)
+    dispatch_deal_event(CRM_DEAL_CREATED)
   end
 
   def dispatch_update_event
-    Rails.configuration.dispatcher.dispatch(update_event_name, Time.zone.now, deal: self)
+    dispatch_deal_event(update_event_name)
+  end
+
+  # Single gate of the realtime side: with the account toggle off there is no board listening, so
+  # publishing card events would only push a module the account cannot open.
+  def dispatch_deal_event(event_name)
+    return unless account.crm_kanban?
+
+    Rails.configuration.dispatcher.dispatch(event_name, Time.zone.now, deal: self)
   end
 
   # A single `save` means four different things to the board, and only what actually changed tells

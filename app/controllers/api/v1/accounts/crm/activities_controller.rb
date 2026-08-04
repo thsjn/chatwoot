@@ -1,4 +1,4 @@
-class Api::V1::Accounts::Crm::ActivitiesController < Api::V1::Accounts::BaseController
+class Api::V1::Accounts::Crm::ActivitiesController < Api::V1::Accounts::Crm::BaseController
   RESULTS_PER_PAGE = 25
 
   before_action :fetch_deal

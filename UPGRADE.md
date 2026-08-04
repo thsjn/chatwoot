@@ -36,11 +36,52 @@ Depois que a imagem publicar, no servidor:
 O entrypoint `docker/entrypoints/rails.sh` roda `rake db:chatwoot_prepare`
 sozinho no boot. **Nao rode migration a mao.**
 
+## Ligar o modulo CRM numa conta
+
+O CRM e **opt-in por conta**, pelo toggle `crm_kanban` em `accounts.settings`.
+Com ele desligado (o padrao) a conta se comporta como se o modulo nunca tivesse
+sido publicado:
+
+- toda a API do CRM (`/api/v1/accounts/:id/crm/*`) responde **404**;
+- o endpoint publico de leads (`/public/api/v1/accounts/:id/crm/leads`) responde
+  **404**, mesmo com token valido;
+- conversa nova **nao** vira card (a ingestao automatica para no
+  `Crm::IngestConversationService`);
+- nenhum evento `crm_deal.*` e publicado no websocket;
+- as rotas do board, dos relatorios e da administracao nao abrem, e o item
+  "Kanban" da sidebar continua mostrando a tela de paywall do fazer.ai.
+
+### Pelo Super Admin (caminho normal)
+
+1. `https://<DOMINIO>/super_admin` → **Accounts** → a conta.
+2. **Edit** → marcar o campo **Crm kanban** → **Update Account**.
+3. O usuario precisa recarregar a aba (`accounts/get` so roda no boot do app)
+   para o item "Kanban" passar a abrir o board.
+
+Desmarcar o campo desliga tudo de novo, na hora, sem deploy.
+
+### Por console (em massa ou emergencia)
+
+```bash
+docker compose -p <SERVICO> exec rails bundle exec rails console
+```
+
+```ruby
+Account.find(<id>).update!(crm_kanban: true)   # ligar
+Account.find(<id>).update!(crm_kanban: false)  # desligar
+Account.where(id: [1, 2, 3]).find_each { |a| a.update!(crm_kanban: true) }
+
+# quem esta ligado hoje
+Account.where("settings->>'crm_kanban' = 'true'").pluck(:id, :name)
+```
+
 ## Rollback
 
 Tres niveis, do mais barato ao mais caro:
 
-1. **Desligar a feature flag** `crm_kanban` — resolve a maioria dos casos sem deploy.
+1. **Desligar o toggle** `crm_kanban` da conta (Super Admin ou console, ver a
+   secao acima) — resolve a maioria dos casos sem deploy: a API volta a 404, a
+   ingestao para e a sidebar volta ao paywall.
 2. **Voltar a tag** — a mesma troca de imagem, invertida. **Medido em 40,3s** no
    ensaio de 04/08/2026 (recriacao dos containers 13s + boot ate a API responder).
 3. **Restaurar o dump** — so se uma migration corrompeu dado.
@@ -69,7 +110,7 @@ depois de 1 minuto.
 
 | Arquivo | Risco | Observacao |
 |---|---|---|
-| `app/javascript/dashboard/routes/dashboard/kanban/Index.vue` | **alto** | e a tela de paywall do fazer.ai, que eles editam. Manter aqui apenas um redirect de 3 linhas; a implementacao vive em `dashboard/routes/dashboard/crm/` |
+| `app/javascript/dashboard/routes/dashboard/kanban/Index.vue` | **alto** | e a tela de paywall do fazer.ai, que eles editam. Aqui ela so foi envelopada no toggle: com `crm_kanban` ligado redireciona para `crm_board`, desligado mantem o paywall. A implementacao vive em `dashboard/routes/dashboard/crm/` |
 | `app/javascript/dashboard/routes/dashboard/kanban/kanban.routes.js` | medio | idem |
 | `config/features.yml` | medio | upstream tambem anexa flags no fim do arquivo |
 | `config/routes.rb` | baixo | bloco proprio do CRM |

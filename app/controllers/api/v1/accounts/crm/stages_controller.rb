@@ -1,4 +1,4 @@
-class Api::V1::Accounts::Crm::StagesController < Api::V1::Accounts::BaseController
+class Api::V1::Accounts::Crm::StagesController < Api::V1::Accounts::Crm::BaseController
   include Crm::DealFilterable
 
   before_action :fetch_pipeline

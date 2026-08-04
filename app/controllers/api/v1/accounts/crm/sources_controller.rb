@@ -1,5 +1,5 @@
-class Api::V1::Accounts::Crm::SourcesController < Api::V1::Accounts::BaseController
-  before_action :fetch_source, only: [:show, :update, :destroy]
+class Api::V1::Accounts::Crm::SourcesController < Api::V1::Accounts::Crm::BaseController
+  before_action :fetch_source, only: [:show, :update, :destroy, :regenerate_token]
   before_action :authorize_source
 
   # Same rule as the lost reasons: a source the account turned off is history on the deals that
@@ -24,6 +24,13 @@ class Api::V1::Accounts::Crm::SourcesController < Api::V1::Accounts::BaseControl
   def destroy
     @source.destroy!
     head :ok
+  end
+
+  # The only response in the whole API that carries the token in the clear: the database keeps a
+  # SHA-256 digest, so nothing can show it again. Calling this on a source that already had a token
+  # invalidates the old one on the spot.
+  def regenerate_token
+    @token = @source.regenerate_token!
   end
 
   private

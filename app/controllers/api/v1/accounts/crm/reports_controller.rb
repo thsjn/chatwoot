@@ -2,7 +2,7 @@
 # `Api::V2::Accounts::ReportsController`: every action shares the exact same input (pipeline +
 # date range + policy scoped deals) and differs only in which service it hands it to. Splitting
 # them into one controller per metric would duplicate that plumbing six times.
-class Api::V1::Accounts::Crm::ReportsController < Api::V1::Accounts::BaseController
+class Api::V1::Accounts::Crm::ReportsController < Api::V1::Accounts::Crm::BaseController
   include DateRangeHelper
 
   before_action :authorize_report

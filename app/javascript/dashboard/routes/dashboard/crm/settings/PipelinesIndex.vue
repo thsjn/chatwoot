@@ -27,8 +27,10 @@ const inboxes = useMapGetter('inboxes/getInboxes');
 
 const dialogRef = ref(null);
 const showDeleteModal = ref(false);
+const showArchiveModal = ref(false);
 const selectedPipeline = ref({});
 const deletingId = ref(null);
+const archivingId = ref(null);
 
 const pipelines = computed(() => settingsStore.getPipelines);
 const uiFlags = computed(() => settingsStore.getUIFlags);
@@ -60,6 +62,40 @@ const openStages = pipeline =>
     params: { accountId: route.params.accountId },
     query: { pipeline_id: pipeline.id },
   });
+
+// Archiving is what retires a funnel that is in use: `delete` is refused while it holds deals, and
+// the cards stay exactly where they are, so restoring brings the board back untouched.
+const openArchiveModal = pipeline => {
+  selectedPipeline.value = pipeline;
+  showArchiveModal.value = true;
+};
+
+const closeArchiveModal = () => {
+  showArchiveModal.value = false;
+};
+
+const confirmArchive = async () => {
+  const pipeline = selectedPipeline.value;
+  const archiving = !pipeline.archived_at;
+  showArchiveModal.value = false;
+  archivingId.value = pipeline.id;
+  try {
+    await settingsStore.setPipelineArchived(pipeline.id, archiving);
+    useAlert(
+      t(
+        archiving
+          ? 'CRM.SETTINGS.PIPELINES.ARCHIVE_SUCCESS'
+          : 'CRM.SETTINGS.PIPELINES.UNARCHIVE_SUCCESS'
+      )
+    );
+  } catch (error) {
+    useAlert(
+      error.response?.data?.message || t('CRM.SETTINGS.PIPELINES.ARCHIVE_ERROR')
+    );
+  } finally {
+    archivingId.value = null;
+  }
+};
 
 const openDeleteModal = pipeline => {
   selectedPipeline.value = pipeline;
@@ -140,6 +176,12 @@ onMounted(() => {
                     >
                       {{ t('CRM.SETTINGS.PIPELINES.DEFAULT_BADGE') }}
                     </span>
+                    <span
+                      v-if="pipeline.archived_at"
+                      class="px-1.5 py-0.5 text-xs font-medium rounded-md bg-n-slate-3 text-n-slate-11"
+                    >
+                      {{ t('CRM.SETTINGS.PIPELINES.ARCHIVED_BADGE') }}
+                    </span>
                   </span>
                   <span class="text-xs truncate text-n-slate-11">
                     {{ pipeline.description }}
@@ -177,6 +219,22 @@ onMounted(() => {
                     @click="dialogRef?.open(pipeline)"
                   />
                   <Button
+                    v-tooltip.top="
+                      pipeline.archived_at
+                        ? t('CRM.SETTINGS.PIPELINES.UNARCHIVE')
+                        : t('CRM.SETTINGS.PIPELINES.ARCHIVE')
+                    "
+                    slate
+                    sm
+                    :icon="
+                      pipeline.archived_at
+                        ? 'i-lucide-archive-restore'
+                        : 'i-lucide-archive'
+                    "
+                    :is-loading="archivingId === pipeline.id"
+                    @click="openArchiveModal(pipeline)"
+                  />
+                  <Button
                     v-tooltip.top="t('CRM.SETTINGS.DELETE')"
                     slate
                     sm
@@ -194,6 +252,29 @@ onMounted(() => {
     </template>
 
     <PipelineDialog ref="dialogRef" />
+
+    <woot-delete-modal
+      v-model:show="showArchiveModal"
+      :on-close="closeArchiveModal"
+      :on-confirm="confirmArchive"
+      :title="
+        selectedPipeline.archived_at
+          ? t('CRM.SETTINGS.PIPELINES.UNARCHIVE_TITLE')
+          : t('CRM.SETTINGS.PIPELINES.ARCHIVE_TITLE')
+      "
+      :message="
+        selectedPipeline.archived_at
+          ? t('CRM.SETTINGS.PIPELINES.UNARCHIVE_MESSAGE')
+          : t('CRM.SETTINGS.PIPELINES.ARCHIVE_MESSAGE')
+      "
+      :message-value="` ${selectedPipeline.name}?`"
+      :confirm-text="
+        selectedPipeline.archived_at
+          ? t('CRM.SETTINGS.PIPELINES.UNARCHIVE')
+          : t('CRM.SETTINGS.PIPELINES.ARCHIVE')
+      "
+      :reject-text="t('CRM.SETTINGS.CANCEL')"
+    />
 
     <woot-delete-modal
       v-model:show="showDeleteModal"

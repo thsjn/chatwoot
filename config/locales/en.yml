@@ -629,8 +629,15 @@ en:
   automation:
     system_name: 'Automation System'
   crm:
+    module_disabled: 'Resource could not be found'
     deal:
       default_title: 'Contact #%{id}'
+    lead_ingestion:
+      invalid_token: 'Invalid or inactive source token'
+      contact_required: 'An email or a phone number is required to identify the contact'
+      pipeline_not_found: 'No active pipeline available for this lead'
+      pipeline_without_stages: 'The pipeline has no stages to receive the lead'
+      source_without_inbox: 'This source has no inbox linked, so the contact cannot be created'
     no_message: 'No messages in conversation'
     attachment: '[Attachment: %{type}]'
     no_content: '[No content]'

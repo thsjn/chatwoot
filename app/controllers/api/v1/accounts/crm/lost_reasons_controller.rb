@@ -1,4 +1,4 @@
-class Api::V1::Accounts::Crm::LostReasonsController < Api::V1::Accounts::BaseController
+class Api::V1::Accounts::Crm::LostReasonsController < Api::V1::Accounts::Crm::BaseController
   before_action :fetch_lost_reason, only: [:show, :update, :destroy]
   before_action :authorize_lost_reason
 

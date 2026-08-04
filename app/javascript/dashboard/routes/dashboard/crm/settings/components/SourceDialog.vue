@@ -35,9 +35,15 @@ const active = ref(true);
 const isEditing = computed(() => !!editingId.value);
 const isInvalid = computed(() => !name.value.trim());
 
-// Only the `inbox` kind carries an inbox: the other kinds describe where the lead came from
-// outside Chatwoot (a landing page, an import, an n8n flow), so the field would mean nothing.
-const isInboxKind = computed(() => kind.value === 'inbox');
+// The `inbox` kind IS an inbox, and the kinds that ingest from outside Chatwoot (a landing page,
+// an n8n flow, a bare API client) need one too: the contact a lead creates is registered there,
+// through the same builder every channel uses. `import` and `manual` have nothing to point at.
+const KINDS_WITH_INBOX = ['inbox', 'landing', 'api', 'n8n'];
+
+const isInboxKind = computed(() => KINDS_WITH_INBOX.includes(kind.value));
+const isExternalKind = computed(
+  () => kind.value !== 'inbox' && isInboxKind.value
+);
 
 const kindOptions = computed(() =>
   SOURCE_KINDS.map(value => ({
@@ -143,7 +149,11 @@ defineExpose({ open });
           :options="inboxOptions"
         />
         <span class="text-xs text-n-slate-10">
-          {{ t('CRM.SETTINGS.SOURCES.INBOX_HINT') }}
+          {{
+            isExternalKind
+              ? t('CRM.SETTINGS.SOURCES.INBOX_EXTERNAL_HINT')
+              : t('CRM.SETTINGS.SOURCES.INBOX_HINT')
+          }}
         </span>
       </label>
 

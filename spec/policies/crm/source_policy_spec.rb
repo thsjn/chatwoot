@@ -21,7 +21,7 @@ RSpec.describe Crm::SourcePolicy, type: :policy do
     end
   end
 
-  permissions :create?, :update?, :destroy? do
+  permissions :create?, :update?, :destroy?, :regenerate_token? do
     it 'allows administrators' do
       expect(subject).to permit(administrator_context, source)
     end

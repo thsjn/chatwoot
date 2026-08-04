@@ -217,4 +217,115 @@ RSpec.describe 'CRM Pipelines API', type: :request do
       end
     end
   end
+
+  describe 'POST /api/v1/accounts/{account.id}/crm/pipelines/:id/archive' do
+    context 'when unauthenticated' do
+      it 'returns unauthorized' do
+        post "/api/v1/accounts/#{account.id}/crm/pipelines/#{pipeline.id}/archive"
+
+        expect(response).to have_http_status(:unauthorized)
+        expect(pipeline.reload.archived_at).to be_nil
+      end
+    end
+
+    context 'when the user is an agent' do
+      it 'is not allowed to retire a pipeline' do
+        post "/api/v1/accounts/#{account.id}/crm/pipelines/#{pipeline.id}/archive",
+             headers: agent.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+        expect(pipeline.reload.archived_at).to be_nil
+      end
+    end
+
+    context 'when the user is an administrator' do
+      it 'archives the pipeline' do
+        post "/api/v1/accounts/#{account.id}/crm/pipelines/#{pipeline.id}/archive",
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['archived_at']).to be_present
+        expect(pipeline.reload.archived_at).to be_present
+      end
+
+      # This is the whole point of archiving instead of deleting: `destroy` is refused while the
+      # pipeline holds deals, so archiving has to retire it WITHOUT touching the cards.
+      it 'keeps every deal of the pipeline intact' do
+        deal = create(:crm_deal, account: account, pipeline: pipeline)
+
+        post "/api/v1/accounts/#{account.id}/crm/pipelines/#{pipeline.id}/archive",
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(deal.reload.archived_at).to be_nil
+        expect(deal.pipeline_id).to eq(pipeline.id)
+        expect(deal.status).to eq('open')
+      end
+
+      it 'returns not found for a pipeline of another account' do
+        foreign_pipeline = create(:crm_pipeline, account: other_account)
+
+        post "/api/v1/accounts/#{account.id}/crm/pipelines/#{foreign_pipeline.id}/archive",
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:not_found)
+        expect(foreign_pipeline.reload.archived_at).to be_nil
+      end
+    end
+  end
+
+  describe 'POST /api/v1/accounts/{account.id}/crm/pipelines/:id/unarchive' do
+    let!(:pipeline) { create(:crm_pipeline, :archived, account: account, name: 'Comercial antigo') }
+
+    context 'when the user is an agent' do
+      it 'is not allowed to restore a pipeline' do
+        post "/api/v1/accounts/#{account.id}/crm/pipelines/#{pipeline.id}/unarchive",
+             headers: agent.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+        expect(pipeline.reload.archived_at).to be_present
+      end
+    end
+
+    context 'when the user is an administrator' do
+      it 'restores the pipeline' do
+        post "/api/v1/accounts/#{account.id}/crm/pipelines/#{pipeline.id}/unarchive",
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['archived_at']).to be_nil
+        expect(pipeline.reload.archived_at).to be_nil
+      end
+    end
+  end
+
+  describe 'archived pipelines on the listing' do
+    let!(:archived_pipeline) { create(:crm_pipeline, :archived, account: account, name: 'Comercial 2024', position: 1) }
+
+    # The board reads this listing to fill its pipeline selector, so a retired funnel must not be
+    # in it — otherwise it stays on screen forever.
+    it 'hides the archived pipelines by default' do
+      get "/api/v1/accounts/#{account.id}/crm/pipelines",
+          headers: agent.create_new_auth_token, as: :json
+
+      ids = response.parsed_body['payload'].pluck('id')
+      expect(ids).to include(pipeline.id)
+      expect(ids).not_to include(archived_pipeline.id)
+    end
+
+    it 'lists the archived pipelines when the administration asks for them' do
+      get "/api/v1/accounts/#{account.id}/crm/pipelines",
+          params: { include_archived: true }, headers: admin.create_new_auth_token, as: :json
+
+      expect(response.parsed_body['payload'].pluck('id')).to include(archived_pipeline.id)
+    end
+
+    it 'keeps the archived pipeline reachable on its own so it can be restored' do
+      get "/api/v1/accounts/#{account.id}/crm/pipelines/#{archived_pipeline.id}",
+          headers: admin.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:success)
+      expect(response.parsed_body['archived_at']).to be_present
+    end
+  end
 end
