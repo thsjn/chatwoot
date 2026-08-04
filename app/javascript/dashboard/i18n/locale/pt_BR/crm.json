@@ -1,5 +1,102 @@
 {
   "CRM": {
+    "REPORTS": {
+      "TITLE": "Relatórios",
+      "BACK_TO_BOARD": "Quadro",
+      "EXPORT_CSV": "Exportar CSV",
+      "EXPORT_ERROR": "Não foi possível exportar as oportunidades",
+      "NO_PIPELINE": "Crie um funil para ver as métricas",
+      "CURRENCY_NOTE": "Os valores aparecem em {currency} e são a soma direta do valor de cada oportunidade, sem conversão de moeda. A exportação em CSV traz a moeda de cada oportunidade.",
+      "CURRENCY_NOTE_MIXED": "Os valores aparecem sem símbolo de moeda: são a soma direta do valor de cada oportunidade, sem conversão de moeda. A exportação em CSV traz a moeda de cada oportunidade.",
+      "MIXED_CURRENCIES": "Esta conta tem funis em mais de uma moeda ({currencies}). Os totais abaixo somam os valores como estão, então não representam um montante em uma única moeda.",
+      "DATE_RANGE": {
+        "LAST_7_DAYS": "Últimos 7 dias",
+        "LAST_30_DAYS": "Últimos 30 dias",
+        "LAST_90_DAYS": "Últimos 90 dias",
+        "THIS_MONTH": "Este mês",
+        "LAST_MONTH": "Mês passado",
+        "THIS_YEAR": "Este ano",
+        "NEXT_90_DAYS": "Próximos 90 dias"
+      },
+      "DURATION": {
+        "DAYS": "{value} d",
+        "HOURS": "{value} h",
+        "MINUTES": "{value} min",
+        "SECONDS": "{value} s",
+        "EMPTY": "Sem dados"
+      },
+      "FUNNEL": {
+        "TITLE": "Funil de conversão",
+        "DESCRIPTION": "Oportunidades que entraram em cada estágio e quantas delas avançaram no funil.",
+        "EMPTY": "Nenhuma oportunidade passou por este funil no período selecionado",
+        "STAGE": "Estágio",
+        "ENTERED": "Entraram",
+        "ADVANCED": "Avançaram",
+        "CONVERSION": "Conversão"
+      },
+      "SOURCES": {
+        "TITLE": "Qual canal traz dinheiro",
+        "DESCRIPTION": "Ganhos e perdas por canal de origem da oportunidade, considerando o que foi fechado no período.",
+        "EMPTY": "Nenhuma oportunidade foi fechada no período selecionado",
+        "CHANNEL": "Canal",
+        "WON": "Ganhas",
+        "WON_VALUE": "Valor ganho",
+        "LOST": "Perdidas",
+        "LOST_VALUE": "Valor perdido",
+        "WIN_RATE": "Taxa de ganho",
+        "NO_SOURCE": "Sem canal informado"
+      },
+      "FORECAST": {
+        "TITLE": "Previsão",
+        "DESCRIPTION": "Oportunidades abertas por mês de fechamento previsto, ponderadas pela probabilidade do estágio em que estão.",
+        "EMPTY": "Nenhuma oportunidade aberta com fechamento previsto no período selecionado",
+        "PERIOD": "Mês de fechamento",
+        "DEALS": "Oportunidades",
+        "GROSS": "Bruto",
+        "WEIGHTED": "Ponderado",
+        "TOTAL": "Total",
+        "NO_DATE": "Sem data prevista",
+        "PAST_RANGE": "O período selecionado já terminou, então só aparecem oportunidades com fechamento previsto no passado. Escolha um período futuro para fazer previsão."
+      },
+      "LOSS_REASONS": {
+        "TITLE": "Motivos de perda",
+        "DESCRIPTION": "Por que as oportunidades foram perdidas no período, em quantidade e em valor.",
+        "EMPTY": "Nenhuma oportunidade foi perdida no período selecionado",
+        "REASON": "Motivo",
+        "DEALS": "Oportunidades",
+        "VALUE": "Valor",
+        "NO_REASON": "Sem motivo registrado"
+      },
+      "SALES_CYCLE": {
+        "TITLE": "Ciclo de vendas",
+        "DESCRIPTION": "Tempo médio entre criar a oportunidade e fechá-la.",
+        "EMPTY": "Nenhuma oportunidade foi fechada no período selecionado",
+        "WON_CYCLE": {
+          "LABEL": "Tempo até ganhar",
+          "INFO": "Tempo médio entre a criação da oportunidade e o momento em que ela foi ganha."
+        },
+        "WON_DEALS": {
+          "LABEL": "Oportunidades ganhas",
+          "INFO": "Quantidade de oportunidades usada para calcular o tempo médio até ganhar."
+        },
+        "LOST_CYCLE": {
+          "LABEL": "Tempo até perder",
+          "INFO": "Tempo médio entre a criação da oportunidade e o momento em que ela foi perdida."
+        },
+        "LOST_DEALS": {
+          "LABEL": "Oportunidades perdidas",
+          "INFO": "Quantidade de oportunidades usada para calcular o tempo médio até perder."
+        }
+      },
+      "STAGE_DURATIONS": {
+        "TITLE": "Tempo por estágio",
+        "DESCRIPTION": "Tempo médio que uma oportunidade fica em cada estágio. Só entram as passagens concluídas, então um card ainda parado no estágio não puxa a média.",
+        "EMPTY": "Nenhum estágio foi concluído no período selecionado",
+        "STAGE": "Estágio",
+        "AVERAGE": "Tempo médio",
+        "SAMPLE": "Movimentações"
+      }
+    },
     "BOARD": {
       "TITLE": "Quadro Kanban",
       "EMPTY_STATE": "Nenhuma oportunidade para exibir",
@@ -11,6 +108,188 @@
       "SHOW_ARCHIVED": "Arquivadas",
       "BACK_TO_BOARD": "Voltar ao quadro",
       "ARCHIVED_HINT": "Exibindo oportunidades arquivadas. Abra um card para restaurá-lo."
+    },
+    "DEAL_FORM": {
+      "TITLE": "Nova oportunidade",
+      "CONTACT": "Contato",
+      "CONTACT_PLACEHOLDER": "Selecione um contato",
+      "CONTACT_SEARCH": "Busque por nome, e-mail ou telefone",
+      "CONTACT_EMPTY": "Nenhum contato encontrado",
+      "DEAL_TITLE": "Título",
+      "DEAL_TITLE_PLACEHOLDER": "Sobre o que é esta oportunidade?",
+      "STAGE": "Estágio",
+      "STAGE_PLACEHOLDER": "Selecione um estágio",
+      "VALUE": "Valor",
+      "EXPECTED_CLOSE": "Data prevista de fechamento",
+      "OWNER": "Responsável",
+      "NO_OWNER": "Sem responsável",
+      "SUBMIT": "Criar oportunidade",
+      "CANCEL": "Cancelar",
+      "SUCCESS": "Oportunidade criada",
+      "ERROR": "Não foi possível criar a oportunidade"
+    },
+    "SETTINGS": {
+      "TITLE": "Configurações do funil",
+      "MANAGE": "Configurações",
+      "BACK_TO_BOARD": "Voltar ao quadro",
+      "SAVE": "Salvar",
+      "CANCEL": "Cancelar",
+      "EDIT": "Editar",
+      "DELETE": "Excluir",
+      "TABS": {
+        "PIPELINES": "Funis",
+        "STAGES": "Estágios",
+        "SOURCES": "Origens",
+        "LOST_REASONS": "Motivos de perda"
+      },
+      "PIPELINES": {
+        "HEADER": "Funis",
+        "DESCRIPTION": "Um funil tem os próprios estágios, as próprias oportunidades e as regras que valem para elas.",
+        "LOADING": "Carregando funis...",
+        "EMPTY": "Nenhum funil cadastrado",
+        "NEW": "Novo funil",
+        "NEW_TITLE": "Novo funil",
+        "EDIT_TITLE": "Editar funil",
+        "NAME": "Nome",
+        "NAME_PLACEHOLDER": "Vendas",
+        "DESCRIPTION_LABEL": "Descrição",
+        "DESCRIPTION_PLACEHOLDER": "Para que serve este funil",
+        "IS_DEFAULT": "Funil padrão",
+        "IS_DEFAULT_HINT": "É o que o quadro abre por padrão. Só um funil pode ser o padrão.",
+        "INGESTION": "Criação automática a partir de conversas",
+        "INGESTION_HINT": "Escolha as caixas de entrada cujas conversas devem virar cards neste funil.",
+        "INGESTION_ON_WARNING": "Toda nova conversa nas caixas selecionadas vai criar um card neste funil (um card por contato dentro da janela de deduplicação). Só ligue para caixas cujas conversas realmente são oportunidades.",
+        "INGESTION_OFF_HINT": "Nenhuma caixa selecionada: este funil não cria cards sozinho. Os cards só entram manualmente pelo quadro.",
+        "INGESTION_OFF": "Desligada",
+        "NO_INBOXES": "Nenhuma caixa de entrada nesta conta",
+        "DEDUPE_DAYS": "Janela de deduplicação (dias)",
+        "DEDUPE_DAYS_HINT": "Um contato que já tem card aberto criado dentro desta janela recebe a nova conversa vinculada a esse card, em vez de um segundo card.",
+        "CURRENCY": "Moeda padrão",
+        "REQUIRES_NEXT_ACTIVITY": "Exigir próxima atividade",
+        "REQUIRES_NEXT_ACTIVITY_HINT": "Sinaliza oportunidades abertas sem tarefa agendada.",
+        "RESTRICTED_BY_OWNER": "Restringir visibilidade ao responsável",
+        "RESTRICTED_BY_OWNER_HINT": "Agentes só veem as próprias oportunidades e as que estão sem responsável. Administradores continuam vendo tudo.",
+        "DEFAULT_BADGE": "Padrão",
+        "MANAGE_STAGES": "Estágios",
+        "SAVE_SUCCESS": "Funil salvo",
+        "SAVE_ERROR": "Não foi possível salvar o funil",
+        "DELETE_TITLE": "Excluir funil",
+        "DELETE_MESSAGE": "Tem certeza de que deseja excluir",
+        "DELETE_SUCCESS": "Funil excluído",
+        "DELETE_ERROR": "Não foi possível excluir o funil",
+        "TABLE": {
+          "NAME": "Nome",
+          "INGESTION": "Criação automática",
+          "CURRENCY": "Moeda",
+          "ACTION": "Ações"
+        }
+      },
+      "STAGES": {
+        "HEADER": "Estágios",
+        "DESCRIPTION": "As colunas do quadro, na ordem em que as oportunidades passam por elas. Arraste para reordenar.",
+        "LOADING": "Carregando estágios...",
+        "EMPTY": "Este funil ainda não tem estágios",
+        "NEW": "Novo estágio",
+        "NEW_TITLE": "Novo estágio",
+        "EDIT_TITLE": "Editar estágio",
+        "NAME": "Nome",
+        "NAME_PLACEHOLDER": "Qualificação",
+        "CATEGORY_LABEL": "Categoria",
+        "CATEGORY_HINT": "Mover um card para um estágio de ganho ou perda fecha a oportunidade.",
+        "CATEGORY": {
+          "OPEN": "Aberta",
+          "WON": "Ganha",
+          "LOST": "Perdida"
+        },
+        "COLOR_LABEL": "Cor",
+        "COLOR": {
+          "SLATE": "Cinza",
+          "BLUE": "Azul",
+          "EMERALD": "Verde",
+          "AMBER": "Âmbar",
+          "RUBY": "Vermelho",
+          "VIOLET": "Violeta"
+        },
+        "PROBABILITY": "Probabilidade (%)",
+        "ROTTING_DAYS": "Apodrece após (dias)",
+        "ROTTING_DAYS_HINT": "O card é sinalizado depois de ficar este tempo aqui sem atividade.",
+        "WIP_LIMIT": "Limite da coluna",
+        "WIP_LIMIT_HINT": "O quadro recusa mover um card para uma coluna que já está cheia.",
+        "IS_ENTRY": "Estágio de entrada",
+        "IS_ENTRY_HINT": "Onde um card novo entra quando nenhum estágio é informado.",
+        "ENTRY_BADGE": "Entrada",
+        "OPTIONAL": "Opcional",
+        "NONE": "nenhum",
+        "SUMMARY": "Probabilidade {probability}% · apodrece: {rotting} · limite: {wip}",
+        "DRAG_HANDLE": "Reordenar estágio",
+        "SAVE_SUCCESS": "Estágio salvo",
+        "SAVE_ERROR": "Não foi possível salvar o estágio",
+        "REORDER_ERROR": "Não foi possível salvar a nova ordem",
+        "DELETE_TITLE": "Excluir estágio",
+        "DELETE_MESSAGE": "Tem certeza de que deseja excluir",
+        "DELETE_SUCCESS": "Estágio excluído",
+        "DELETE_ERROR": "Não foi possível excluir o estágio"
+      },
+      "SOURCES": {
+        "HEADER": "Origens",
+        "DESCRIPTION": "De onde vêm as oportunidades. Uma origem nunca é excluída: desativá-la mantém o histórico nas oportunidades que já a usam e a tira dos seletores.",
+        "LOADING": "Carregando origens...",
+        "EMPTY": "Nenhuma origem cadastrada",
+        "NEW": "Nova origem",
+        "NEW_TITLE": "Nova origem",
+        "EDIT_TITLE": "Editar origem",
+        "NAME": "Nome",
+        "NAME_PLACEHOLDER": "Formulário do site",
+        "KIND_LABEL": "Tipo",
+        "KIND": {
+          "INBOX": "Caixa de entrada",
+          "LANDING": "Landing page",
+          "IMPORT": "Importação",
+          "API": "API",
+          "N8N": "n8n",
+          "MANUAL": "Manual"
+        },
+        "INBOX": "Caixa de entrada",
+        "INBOX_HINT": "A caixa que esta origem representa. Oportunidades criadas a partir dela recebem esta origem.",
+        "NO_INBOX": "Sem caixa de entrada",
+        "IDENTIFIER": "Identificador",
+        "IDENTIFIER_PLACEHOLDER": "formulario-site",
+        "IDENTIFIER_HINT": "Chave única usada por integrações para referenciar esta origem.",
+        "ACTIVE": "Ativa",
+        "ACTIVE_HINT": "Uma origem inativa continua nas oportunidades que já a usam, mas deixa de ser oferecida.",
+        "SAVE_SUCCESS": "Origem salva",
+        "SAVE_ERROR": "Não foi possível salvar a origem",
+        "TABLE": {
+          "NAME": "Nome",
+          "KIND": "Tipo",
+          "INBOX": "Caixa de entrada",
+          "ACTIVE": "Ativa",
+          "ACTION": "Ações"
+        }
+      },
+      "LOST_REASONS": {
+        "HEADER": "Motivos de perda",
+        "DESCRIPTION": "As respostas oferecidas quando uma oportunidade é marcada como perdida. Um motivo desativado continua nas oportunidades que já o usam e sai do seletor.",
+        "LOADING": "Carregando motivos de perda...",
+        "EMPTY": "Nenhum motivo de perda cadastrado",
+        "NEW": "Novo motivo",
+        "NEW_TITLE": "Novo motivo de perda",
+        "EDIT_TITLE": "Editar motivo de perda",
+        "NAME": "Nome",
+        "NAME_PLACEHOLDER": "Preço acima do orçamento",
+        "POSITION": "Posição",
+        "POSITION_HINT": "Ordem em que os motivos aparecem, do menor para o maior.",
+        "ACTIVE": "Ativo",
+        "ACTIVE_HINT": "Um motivo inativo não pode ser escolhido ao fechar uma oportunidade.",
+        "SAVE_SUCCESS": "Motivo de perda salvo",
+        "SAVE_ERROR": "Não foi possível salvar o motivo de perda",
+        "TABLE": {
+          "NAME": "Nome",
+          "POSITION": "Posição",
+          "ACTIVE": "Ativo",
+          "ACTION": "Ações"
+        }
+      }
     },
     "FILTERS": {
       "ALL_SOURCES": "Todas as origens",

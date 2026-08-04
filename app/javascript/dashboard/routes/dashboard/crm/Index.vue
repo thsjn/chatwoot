@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRoute, useRouter } from 'vue-router';
 import { useDebounceFn } from '@vueuse/core';
 import {
   addDays,
@@ -13,6 +14,7 @@ import {
 } from 'date-fns';
 
 import { useStore, useMapGetter } from 'dashboard/composables/store';
+import { useAdmin } from 'dashboard/composables/useAdmin';
 import {
   useCrmBoardStore,
   LOST_REASON_ERRORS,
@@ -25,6 +27,7 @@ import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
 import BoardColumn from './components/BoardColumn.vue';
 import DealDrawer from './components/DealDrawer.vue';
+import DealFormModal from './components/DealFormModal.vue';
 import LostReasonModal from './components/LostReasonModal.vue';
 
 const SEARCH_DEBOUNCE_MS = 400;
@@ -56,11 +59,17 @@ const CLOSE_PERIODS = {
 };
 
 const { t } = useI18n();
+const route = useRoute();
+const router = useRouter();
 const store = useCrmBoardStore();
 const rootStore = useStore();
+// The funnel configuration is administrator only (`Crm::PipelinePolicy` and friends), so the
+// entry point is hidden instead of leaving an agent to discover it through a 401.
+const { isAdmin } = useAdmin();
 
 const agents = useMapGetter('agents/getAgents');
 
+const dealFormRef = ref(null);
 const searchQuery = ref('');
 const sourceId = ref('');
 const status = ref('');
@@ -140,6 +149,24 @@ watch([searchQuery, sourceId, status, ownerId, closePeriod], applyFilters);
 
 const toggleArchived = () => store.setShowArchived(!showArchived.value);
 
+// The column plus button says which stage the card belongs to; the header button leaves it to
+// the form, which falls back to the first column of the board.
+const openDealForm = (stageId = null) => dealFormRef.value?.open(stageId);
+
+const openSettings = () =>
+  router.push({
+    name: 'crm_settings_pipelines',
+    params: { accountId: route.params.accountId },
+  });
+
+// The funnel metrics are reachable from the board itself: the reports live on
+// their own screen and nothing in the upstream sidebar points at them.
+const openReports = () =>
+  router.push({
+    name: 'crm_reports',
+    params: { accountId: route.params.accountId },
+  });
+
 onMounted(async () => {
   rootStore.dispatch('agents/get');
 
@@ -179,6 +206,24 @@ onMounted(async () => {
       <Select v-model="ownerId" :options="ownerOptions" />
       <Select v-model="closePeriod" :options="closePeriodOptions" />
       <Button
+        v-if="!showArchived"
+        size="sm"
+        color="blue"
+        icon="i-lucide-plus"
+        :label="t('CRM.BOARD.ADD_DEAL')"
+        :disabled="!stages.length"
+        @click="openDealForm()"
+      />
+      <Button
+        v-if="isAdmin"
+        size="sm"
+        variant="faded"
+        color="slate"
+        icon="i-lucide-settings"
+        :label="t('CRM.SETTINGS.MANAGE')"
+        @click="openSettings"
+      />
+      <Button
         size="sm"
         :variant="showArchived ? 'solid' : 'faded'"
         color="slate"
@@ -189,6 +234,14 @@ onMounted(async () => {
             : t('CRM.BOARD.SHOW_ARCHIVED')
         "
         @click="toggleArchived"
+      />
+      <Button
+        size="sm"
+        variant="faded"
+        color="slate"
+        icon="i-lucide-chart-no-axes-column"
+        :label="t('CRM.REPORTS.TITLE')"
+        @click="openReports"
       />
       <Spinner
         v-if="uiFlags.fetchingDeals || uiFlags.movingDeal"
@@ -233,6 +286,7 @@ onMounted(async () => {
         :key="stage.id"
         :stage="stage"
         @select-deal="selectedDealId = $event"
+        @add-deal="openDealForm"
       />
     </div>
 
@@ -241,6 +295,8 @@ onMounted(async () => {
       :deal-id="selectedDealId"
       @close="selectedDealId = null"
     />
+
+    <DealFormModal ref="dealFormRef" />
 
     <LostReasonModal />
   </main>

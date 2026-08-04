@@ -6,6 +6,12 @@ class CrmLostReasons extends ApiClient {
     super('crm/lost_reasons', { accountScoped: true });
   }
 
+  // Same contract as the sources index: retired reasons are hidden from the pickers and only
+  // the administration screen asks for them through `include_inactive=true`.
+  get(params = {}) {
+    return axios.get(this.url, { params });
+  }
+
   create(data) {
     return axios.post(this.url, { lost_reason: data });
   }

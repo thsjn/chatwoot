@@ -13,7 +13,7 @@ const props = defineProps({
   stage: { type: Object, required: true },
 });
 
-const emit = defineEmits(['selectDeal']);
+const emit = defineEmits(['selectDeal', 'addDeal']);
 
 // `stage.color` is a closed token set, so the classes are written as literals for the Tailwind
 // scanner to pick them up — an interpolated class name would never be emitted.
@@ -111,11 +111,22 @@ const handleChange = event => {
           </span>
         </div>
         <!-- The aggregates describe the active pipeline, so they step aside
-        while the column lists archived cards. -->
+        while the column lists archived cards. Same for the add button: the
+        archived view is a listing of what left the board, not a place to
+        create on. -->
         <div
           v-if="!isArchivedView"
           class="flex items-center flex-shrink-0 gap-1"
         >
+          <Button
+            ghost
+            slate
+            size="xs"
+            icon="i-lucide-plus"
+            :aria-label="t('CRM.BOARD.ADD_DEAL')"
+            :title="t('CRM.BOARD.ADD_DEAL')"
+            @click="emit('addDeal', stage.id)"
+          />
           <span
             v-if="hasFilteredTotals"
             class="flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded-md tabular-nums bg-n-blue-3 text-n-blue-11"

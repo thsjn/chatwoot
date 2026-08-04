@@ -1,5 +1,102 @@
 {
   "CRM": {
+    "REPORTS": {
+      "TITLE": "Reports",
+      "BACK_TO_BOARD": "Board",
+      "EXPORT_CSV": "Export CSV",
+      "EXPORT_ERROR": "Could not export the deals",
+      "NO_PIPELINE": "Create a pipeline to see the funnel metrics",
+      "CURRENCY_NOTE": "Amounts are shown in {currency} and are plain sums of each deal value, with no currency conversion. The CSV export carries the currency of every deal.",
+      "CURRENCY_NOTE_MIXED": "Amounts are shown without a currency symbol: they are plain sums of each deal value, with no currency conversion. The CSV export carries the currency of every deal.",
+      "MIXED_CURRENCIES": "This account has pipelines in more than one currency ({currencies}). The totals below add up the deal values as they are, so they do not represent an amount in a single currency.",
+      "DATE_RANGE": {
+        "LAST_7_DAYS": "Last 7 days",
+        "LAST_30_DAYS": "Last 30 days",
+        "LAST_90_DAYS": "Last 90 days",
+        "THIS_MONTH": "This month",
+        "LAST_MONTH": "Last month",
+        "THIS_YEAR": "This year",
+        "NEXT_90_DAYS": "Next 90 days"
+      },
+      "DURATION": {
+        "DAYS": "{value} d",
+        "HOURS": "{value} h",
+        "MINUTES": "{value} min",
+        "SECONDS": "{value} s",
+        "EMPTY": "No data"
+      },
+      "FUNNEL": {
+        "TITLE": "Conversion funnel",
+        "DESCRIPTION": "Deals that entered each stage and how many of them moved further down the pipeline.",
+        "EMPTY": "No deals went through this pipeline in the selected period",
+        "STAGE": "Stage",
+        "ENTERED": "Entered",
+        "ADVANCED": "Advanced",
+        "CONVERSION": "Conversion"
+      },
+      "SOURCES": {
+        "TITLE": "Which channel brings money",
+        "DESCRIPTION": "Wins and losses by the channel the deal came from, closed within the selected period.",
+        "EMPTY": "No deals were closed in the selected period",
+        "CHANNEL": "Channel",
+        "WON": "Won",
+        "WON_VALUE": "Won value",
+        "LOST": "Lost",
+        "LOST_VALUE": "Lost value",
+        "WIN_RATE": "Win rate",
+        "NO_SOURCE": "No channel tagged"
+      },
+      "FORECAST": {
+        "TITLE": "Forecast",
+        "DESCRIPTION": "Open deals by expected close month, weighted by the probability of the stage they are in.",
+        "EMPTY": "No open deals expected to close in the selected period",
+        "PERIOD": "Close month",
+        "DEALS": "Deals",
+        "GROSS": "Gross",
+        "WEIGHTED": "Weighted",
+        "TOTAL": "Total",
+        "NO_DATE": "No close date",
+        "PAST_RANGE": "The selected period has already ended, so it can only show deals whose expected close date is in the past. Pick a future period to forecast."
+      },
+      "LOSS_REASONS": {
+        "TITLE": "Loss reasons",
+        "DESCRIPTION": "Why deals were lost in the selected period, by count and value.",
+        "EMPTY": "No deals were lost in the selected period",
+        "REASON": "Reason",
+        "DEALS": "Deals",
+        "VALUE": "Value",
+        "NO_REASON": "No reason recorded"
+      },
+      "SALES_CYCLE": {
+        "TITLE": "Sales cycle",
+        "DESCRIPTION": "Average time between creating a deal and closing it.",
+        "EMPTY": "No deals were closed in the selected period",
+        "WON_CYCLE": {
+          "LABEL": "Time to win",
+          "INFO": "Average time between the creation of a deal and the moment it was won."
+        },
+        "WON_DEALS": {
+          "LABEL": "Deals won",
+          "INFO": "Number of deals the average time to win was calculated from."
+        },
+        "LOST_CYCLE": {
+          "LABEL": "Time to lose",
+          "INFO": "Average time between the creation of a deal and the moment it was lost."
+        },
+        "LOST_DEALS": {
+          "LABEL": "Deals lost",
+          "INFO": "Number of deals the average time to lose was calculated from."
+        }
+      },
+      "STAGE_DURATIONS": {
+        "TITLE": "Time per stage",
+        "DESCRIPTION": "Average time a deal stays in each stage. Only completed stays are counted, so a card still sitting in a stage is not in the average.",
+        "EMPTY": "No stage was completed in the selected period",
+        "STAGE": "Stage",
+        "AVERAGE": "Average time",
+        "SAMPLE": "Moves"
+      }
+    },
     "BOARD": {
       "TITLE": "Kanban Board",
       "EMPTY_STATE": "No deals to display",
@@ -11,6 +108,188 @@
       "SHOW_ARCHIVED": "Archived",
       "BACK_TO_BOARD": "Back to board",
       "ARCHIVED_HINT": "Showing archived deals. Open a card to restore it."
+    },
+    "DEAL_FORM": {
+      "TITLE": "New deal",
+      "CONTACT": "Contact",
+      "CONTACT_PLACEHOLDER": "Select a contact",
+      "CONTACT_SEARCH": "Search by name, email or phone",
+      "CONTACT_EMPTY": "No contacts found",
+      "DEAL_TITLE": "Title",
+      "DEAL_TITLE_PLACEHOLDER": "What is this deal about?",
+      "STAGE": "Stage",
+      "STAGE_PLACEHOLDER": "Select a stage",
+      "VALUE": "Value",
+      "EXPECTED_CLOSE": "Expected close date",
+      "OWNER": "Owner",
+      "NO_OWNER": "No owner assigned",
+      "SUBMIT": "Create deal",
+      "CANCEL": "Cancel",
+      "SUCCESS": "Deal created",
+      "ERROR": "Could not create the deal"
+    },
+    "SETTINGS": {
+      "TITLE": "Funnel settings",
+      "MANAGE": "Settings",
+      "BACK_TO_BOARD": "Back to board",
+      "SAVE": "Save",
+      "CANCEL": "Cancel",
+      "EDIT": "Edit",
+      "DELETE": "Delete",
+      "TABS": {
+        "PIPELINES": "Pipelines",
+        "STAGES": "Stages",
+        "SOURCES": "Sources",
+        "LOST_REASONS": "Lost reasons"
+      },
+      "PIPELINES": {
+        "HEADER": "Pipelines",
+        "DESCRIPTION": "A pipeline is a funnel: it holds its own stages, its own deals and the rules that govern them.",
+        "LOADING": "Loading pipelines...",
+        "EMPTY": "No pipelines yet",
+        "NEW": "New pipeline",
+        "NEW_TITLE": "New pipeline",
+        "EDIT_TITLE": "Edit pipeline",
+        "NAME": "Name",
+        "NAME_PLACEHOLDER": "Sales",
+        "DESCRIPTION_LABEL": "Description",
+        "DESCRIPTION_PLACEHOLDER": "What this funnel is for",
+        "IS_DEFAULT": "Default pipeline",
+        "IS_DEFAULT_HINT": "The one the board opens on. Only one pipeline can be the default.",
+        "INGESTION": "Automatic ingestion from conversations",
+        "INGESTION_HINT": "Pick the inboxes whose conversations should become cards in this funnel.",
+        "INGESTION_ON_WARNING": "Every new conversation in the selected inboxes will create a card in this funnel (one card per contact within the deduplication window). Only turn this on for inboxes whose conversations really are opportunities.",
+        "INGESTION_OFF_HINT": "No inbox selected: this funnel never creates cards on its own. Cards are only added by hand from the board.",
+        "INGESTION_OFF": "Off",
+        "NO_INBOXES": "No inboxes in this account",
+        "DEDUPE_DAYS": "Deduplication window (days)",
+        "DEDUPE_DAYS_HINT": "A contact who already has an open card created within this window gets the new conversation linked to that card instead of a second one.",
+        "CURRENCY": "Default currency",
+        "REQUIRES_NEXT_ACTIVITY": "Require a next activity",
+        "REQUIRES_NEXT_ACTIVITY_HINT": "Flags open deals with no scheduled task.",
+        "RESTRICTED_BY_OWNER": "Restrict visibility to the owner",
+        "RESTRICTED_BY_OWNER_HINT": "Agents only see their own deals and the ones with no owner. Administrators keep seeing everything.",
+        "DEFAULT_BADGE": "Default",
+        "MANAGE_STAGES": "Stages",
+        "SAVE_SUCCESS": "Pipeline saved",
+        "SAVE_ERROR": "Could not save the pipeline",
+        "DELETE_TITLE": "Delete pipeline",
+        "DELETE_MESSAGE": "Are you sure you want to delete",
+        "DELETE_SUCCESS": "Pipeline deleted",
+        "DELETE_ERROR": "Could not delete the pipeline",
+        "TABLE": {
+          "NAME": "Name",
+          "INGESTION": "Ingestion",
+          "CURRENCY": "Currency",
+          "ACTION": "Actions"
+        }
+      },
+      "STAGES": {
+        "HEADER": "Stages",
+        "DESCRIPTION": "The columns of the board, in the order the deals travel through them. Drag to reorder.",
+        "LOADING": "Loading stages...",
+        "EMPTY": "This pipeline has no stages yet",
+        "NEW": "New stage",
+        "NEW_TITLE": "New stage",
+        "EDIT_TITLE": "Edit stage",
+        "NAME": "Name",
+        "NAME_PLACEHOLDER": "Qualification",
+        "CATEGORY_LABEL": "Category",
+        "CATEGORY_HINT": "Moving a card into a won or lost stage closes the deal.",
+        "CATEGORY": {
+          "OPEN": "Open",
+          "WON": "Won",
+          "LOST": "Lost"
+        },
+        "COLOR_LABEL": "Colour",
+        "COLOR": {
+          "SLATE": "Grey",
+          "BLUE": "Blue",
+          "EMERALD": "Green",
+          "AMBER": "Amber",
+          "RUBY": "Red",
+          "VIOLET": "Violet"
+        },
+        "PROBABILITY": "Probability (%)",
+        "ROTTING_DAYS": "Rotting after (days)",
+        "ROTTING_DAYS_HINT": "The card is flagged once it sits here without activity for this long.",
+        "WIP_LIMIT": "Column limit",
+        "WIP_LIMIT_HINT": "The board refuses a move into a column that is already full.",
+        "IS_ENTRY": "Entry stage",
+        "IS_ENTRY_HINT": "Where a new card lands when no stage is given.",
+        "ENTRY_BADGE": "Entry",
+        "OPTIONAL": "Optional",
+        "NONE": "none",
+        "SUMMARY": "Probability {probability}% · rotting: {rotting} · limit: {wip}",
+        "DRAG_HANDLE": "Reorder stage",
+        "SAVE_SUCCESS": "Stage saved",
+        "SAVE_ERROR": "Could not save the stage",
+        "REORDER_ERROR": "Could not save the new order",
+        "DELETE_TITLE": "Delete stage",
+        "DELETE_MESSAGE": "Are you sure you want to delete",
+        "DELETE_SUCCESS": "Stage deleted",
+        "DELETE_ERROR": "Could not delete the stage"
+      },
+      "SOURCES": {
+        "HEADER": "Sources",
+        "DESCRIPTION": "Where the deals come from. A source is never deleted: turning it off keeps it on the deals that already carry it and removes it from the pickers.",
+        "LOADING": "Loading sources...",
+        "EMPTY": "No sources yet",
+        "NEW": "New source",
+        "NEW_TITLE": "New source",
+        "EDIT_TITLE": "Edit source",
+        "NAME": "Name",
+        "NAME_PLACEHOLDER": "Website form",
+        "KIND_LABEL": "Kind",
+        "KIND": {
+          "INBOX": "Inbox",
+          "LANDING": "Landing page",
+          "IMPORT": "Import",
+          "API": "API",
+          "N8N": "n8n",
+          "MANUAL": "Manual"
+        },
+        "INBOX": "Inbox",
+        "INBOX_HINT": "The inbox this source stands for. Deals ingested from that inbox are tagged with it.",
+        "NO_INBOX": "No inbox",
+        "IDENTIFIER": "Identifier",
+        "IDENTIFIER_PLACEHOLDER": "website-form",
+        "IDENTIFIER_HINT": "Unique key used by integrations to reference this source.",
+        "ACTIVE": "Active",
+        "ACTIVE_HINT": "An inactive source stays on the deals that carry it but stops being offered.",
+        "SAVE_SUCCESS": "Source saved",
+        "SAVE_ERROR": "Could not save the source",
+        "TABLE": {
+          "NAME": "Name",
+          "KIND": "Kind",
+          "INBOX": "Inbox",
+          "ACTIVE": "Active",
+          "ACTION": "Actions"
+        }
+      },
+      "LOST_REASONS": {
+        "HEADER": "Lost reasons",
+        "DESCRIPTION": "The answers offered when a deal is marked as lost. A retired reason stays on the deals that carry it and leaves the picker.",
+        "LOADING": "Loading lost reasons...",
+        "EMPTY": "No lost reasons yet",
+        "NEW": "New reason",
+        "NEW_TITLE": "New lost reason",
+        "EDIT_TITLE": "Edit lost reason",
+        "NAME": "Name",
+        "NAME_PLACEHOLDER": "Price too high",
+        "POSITION": "Position",
+        "POSITION_HINT": "Order the reasons appear in, lowest first.",
+        "ACTIVE": "Active",
+        "ACTIVE_HINT": "An inactive reason cannot be picked when closing a deal.",
+        "SAVE_SUCCESS": "Lost reason saved",
+        "SAVE_ERROR": "Could not save the lost reason",
+        "TABLE": {
+          "NAME": "Name",
+          "POSITION": "Position",
+          "ACTIVE": "Active",
+          "ACTION": "Actions"
+        }
+      }
     },
     "FILTERS": {
       "ALL_SOURCES": "All sources",
