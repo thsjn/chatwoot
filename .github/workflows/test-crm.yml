@@ -1,0 +1,102 @@
+name: Testes CRM
+
+# O workflow de specs do upstream (run_foss_spec.yml) roda em runners
+# `blacksmith-*`, que sao self-hosted do fazer-ai e nao existem neste fork.
+# Este workflow usa runners publicos e executa apenas os specs do modulo CRM,
+# para dar feedback rapido. Como nao ha Ruby na maquina de desenvolvimento,
+# ESTE E o ambiente de validacao do codigo backend.
+
+on:
+  push:
+    branches: [crm]
+    paths:
+      - "app/models/crm/**"
+      - "app/controllers/api/v1/accounts/crm/**"
+      - "app/policies/crm/**"
+      - "app/views/api/v1/accounts/crm/**"
+      - "app/listeners/crm_listener.rb"
+      - "db/migrate/**"
+      - "spec/models/crm/**"
+      - "spec/requests/api/v1/accounts/crm/**"
+      - "spec/factories/crm_*"
+      - ".github/workflows/test-crm.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ""
+          POSTGRES_DB: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+        options: --entrypoint redis-server
+
+    env:
+      RAILS_ENV: test
+      POSTGRES_HOST: localhost
+      POSTGRES_USERNAME: postgres
+      POSTGRES_PASSWORD: ""
+      REDIS_URL: redis://localhost:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Instalar dependencias do front
+        run: pnpm i
+
+      # Mesmo strip do build: o diretorio esta sob licenca comercial.
+      - name: Remover codigo enterprise
+        run: |
+          rm -rf enterprise
+          rm -rf spec/enterprise
+
+      - name: Preparar banco
+        run: |
+          bundle exec rake db:create
+          bundle exec rake db:schema:load
+
+      # Valida que as migrations do CRM aplicam sobre o schema do upstream.
+      # Como nao ha Ruby local, o schema.rb nao e regenerado no desenvolvimento;
+      # este passo e o que prova que as migrations sao validas.
+      - name: Aplicar migrations do CRM
+        run: bundle exec rake db:migrate
+
+      - name: Specs do CRM
+        run: |
+          if compgen -G "spec/models/crm/*_spec.rb" > /dev/null || \
+             compgen -G "spec/requests/api/v1/accounts/crm/*_spec.rb" > /dev/null; then
+            bundle exec rspec spec/models/crm spec/requests/api/v1/accounts/crm \
+              --format progress
+          else
+            echo "Nenhum spec de CRM ainda — nada a rodar."
+          fi
+        shell: bash

@@ -68,6 +68,7 @@ class Contact < ApplicationRecord # rubocop:disable Metrics/ClassLength
                                inverse_of: :group_contact
   has_many :group_member_contacts, through: :group_memberships, source: :contact
   has_many :group_participations, class_name: 'GroupMember', dependent: :destroy, inverse_of: :contact
+  has_many :crm_deals, class_name: 'Crm::Deal', dependent: :destroy
   before_validation :prepare_contact_attributes
   after_create_commit :dispatch_create_event, :ip_lookup
   after_update_commit :dispatch_update_event

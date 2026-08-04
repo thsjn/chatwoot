@@ -136,6 +136,8 @@ class Conversation < ApplicationRecord
   has_many :reporting_events, dependent: :destroy_async
   has_many :scheduled_messages, dependent: :destroy
   has_many :recurring_scheduled_messages, dependent: :destroy
+  has_many :crm_deal_conversations, class_name: 'Crm::DealConversation', dependent: :destroy
+  has_many :crm_deals, through: :crm_deal_conversations, source: :deal
 
   before_save :ensure_snooze_until_reset
   before_create :determine_conversation_status
