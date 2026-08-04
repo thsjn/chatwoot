@@ -195,6 +195,35 @@ RSpec.describe Crm::Deal do
     end
   end
 
+  describe '#next_activity_at' do
+    let(:deal) { create(:crm_deal, account: account, pipeline: pipeline, stage: stage) }
+
+    it 'returns the earliest open activity due in the future' do
+      create(:crm_activity, :task, account: account, deal: deal, due_at: 5.days.from_now)
+      next_task = create(:crm_activity, :task, account: account, deal: deal, due_at: 2.days.from_now)
+
+      expect(deal.next_activity_at).to be_within(1.second).of(next_task.due_at)
+    end
+
+    it 'ignores overdue, completed and undated activities' do
+      create(:crm_activity, :task, account: account, deal: deal, due_at: 1.day.ago)
+      create(:crm_activity, :task, :completed, account: account, deal: deal, due_at: 1.day.from_now)
+      create(:crm_activity, account: account, deal: deal, due_at: nil)
+
+      expect(deal.next_activity_at).to be_nil
+    end
+
+    it 'resolves the same value from the listing scope without loading the activities' do
+      next_task = create(:crm_activity, :task, account: account, deal: deal, due_at: 2.days.from_now)
+      create(:crm_activity, :task, account: account, deal: deal, due_at: 1.day.ago)
+
+      loaded = described_class.with_next_activity.find(deal.id)
+
+      expect(loaded.next_activity_at).to be_within(1.second).of(next_task.due_at)
+      expect(loaded.activities).not_to be_loaded
+    end
+  end
+
   describe 'optimistic locking' do
     it 'raises when a stale copy is saved' do
       deal = create(:crm_deal, account: account)

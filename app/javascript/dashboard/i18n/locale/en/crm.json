@@ -1,0 +1,102 @@
+{
+  "CRM": {
+    "BOARD": {
+      "TITLE": "Kanban Board",
+      "EMPTY_STATE": "No deals to display",
+      "LOADING": "Loading deals...",
+      "ADD_DEAL": "Add deal",
+      "SEARCH_PLACEHOLDER": "Search deals by title",
+      "LOAD_MORE": "Load more",
+      "DISMISS": "Dismiss"
+    },
+    "FILTERS": {
+      "ALL_SOURCES": "All sources",
+      "ALL_STATUSES": "All statuses",
+      "STATUS": {
+        "OPEN": "Open",
+        "WON": "Won",
+        "LOST": "Lost"
+      }
+    },
+    "PIPELINE": {
+      "SELECT": "Select pipeline",
+      "NONE": "No pipeline",
+      "MANAGE": "Manage pipelines"
+    },
+    "STAGE": {
+      "WIP_FULL": "Column limit reached",
+      "WIP_COUNT": "{count} of {limit}",
+      "EMPTY": "No deals in this stage"
+    },
+    "DEAL": {
+      "VALUE": "Deal Value",
+      "OWNER": "Owner",
+      "NO_OWNER": "No owner assigned",
+      "CONTACT": "Contact",
+      "SOURCE": "Source",
+      "EXPECTED_CLOSE": "Expected Close Date",
+      "CREATED_AT": "Created",
+      "ROTTING": "Inactive for {days} days",
+      "NO_NEXT_ACTIVITY": "No next activity scheduled",
+      "DETAILS": "Deal details",
+      "EDIT_TITLE": "Edit deal title",
+      "TITLE_PLACEHOLDER": "Deal title",
+      "CANCEL": "Cancel",
+      "CLOSE": "Close deal panel",
+      "ARCHIVE": "Archive",
+      "ARCHIVE_CONFIRM": "Confirm archive",
+      "ARCHIVE_HINT": "The card leaves the board",
+      "ARCHIVE_SUCCESS": "Deal archived",
+      "STATUS_OPEN": "Open",
+      "STATUS_WON": "Won",
+      "STATUS_LOST": "Lost",
+      "TEAM": "Team",
+      "NO_TEAM": "No team assigned",
+      "NO_SOURCE": "No source",
+      "NO_EMAIL": "No email address",
+      "NO_PHONE": "No phone number",
+      "CONVERSATIONS": "Linked conversations",
+      "NO_CONVERSATIONS": "No conversations linked to this deal",
+      "CONVERSATION_ID": "Conversation #{id}",
+      "CONVERSATION_ORIGIN": "Origin",
+      "NEXT_ACTIVITY_HINT": "Schedule a task so this deal keeps moving",
+      "UPDATE_ERROR": "Could not save the deal",
+      "ARCHIVE_ERROR": "Could not archive the deal"
+    },
+    "MOVE": {
+      "CONFLICT": "This card has been updated by another user. Please refresh the list.",
+      "WIP_EXCEEDED": "Cannot move deal: column limit exceeded",
+      "LOST_REASON_REQUIRED": "Lost reason is required",
+      "GENERIC_ERROR": "An error occurred while moving the deal"
+    },
+    "LOST_REASON": {
+      "MODAL_TITLE": "Mark deal as lost",
+      "SELECT": "Select a reason",
+      "CONFIRM": "Confirm",
+      "CANCEL": "Cancel"
+    },
+    "ACTIVITY": {
+      "TITLE": "Activity",
+      "ADD": "Add activity",
+      "KIND": {
+        "NOTE": "Note",
+        "CALL": "Call",
+        "MEETING": "Meeting",
+        "TASK": "Task",
+        "WHATSAPP": "WhatsApp",
+        "SYSTEM": "System"
+      },
+      "DUE_AT": "Due date",
+      "COMPLETED": "Completed",
+      "MARK_DONE": "Mark as done",
+      "TIMELINE": "Timeline",
+      "EMPTY": "No activities yet",
+      "NOTE_PLACEHOLDER": "Write a note...",
+      "TASK_PLACEHOLDER": "What needs to be done?",
+      "OVERDUE": "Overdue",
+      "LOAD_ERROR": "Could not load the activities",
+      "CREATE_ERROR": "Could not create the activity",
+      "UPDATE_ERROR": "Could not update the activity"
+    }
+  }
+}

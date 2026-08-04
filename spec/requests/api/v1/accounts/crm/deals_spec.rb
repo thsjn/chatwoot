@@ -48,6 +48,65 @@ RSpec.describe 'CRM Deals API', type: :request do
         expect(payload.first['contact']['id']).to eq(contact.id)
       end
 
+      it 'exposes the next open activity due in the future' do
+        create(:crm_activity, :task, account: account, deal: deal, due_at: 3.days.from_now)
+        next_task = create(:crm_activity, :task, account: account, deal: deal, due_at: 1.day.from_now)
+
+        get "/api/v1/accounts/#{account.id}/crm/deals",
+            headers: admin.create_new_auth_token, as: :json
+
+        expect(response.parsed_body['payload'].first['next_activity_at']).to eq(next_task.due_at.to_i)
+      end
+
+      it 'ignores overdue and completed activities when resolving the next activity' do
+        create(:crm_activity, :task, account: account, deal: deal, due_at: 1.day.ago)
+        create(:crm_activity, :task, :completed, account: account, deal: deal, due_at: 1.day.from_now)
+
+        get "/api/v1/accounts/#{account.id}/crm/deals",
+            headers: admin.create_new_auth_token, as: :json
+
+        expect(response.parsed_body['payload'].first['next_activity_at']).to be_nil
+      end
+
+      it 'returns a null next activity when the deal has no activity at all' do
+        get "/api/v1/accounts/#{account.id}/crm/deals",
+            headers: admin.create_new_auth_token, as: :json
+
+        expect(response.parsed_body['payload'].first).to have_key('next_activity_at')
+        expect(response.parsed_body['payload'].first['next_activity_at']).to be_nil
+      end
+
+      it 'exposes the conversations linked to the deal and flags the origin one' do
+        origin_conversation = create(:conversation, account: account, contact: contact)
+        other_conversation = create(:conversation, account: account, contact: contact)
+        create(:crm_deal_conversation, :origin, deal: deal, conversation: origin_conversation)
+        create(:crm_deal_conversation, deal: deal, conversation: other_conversation)
+
+        get "/api/v1/accounts/#{account.id}/crm/deals",
+            headers: admin.create_new_auth_token, as: :json
+
+        conversations = response.parsed_body['payload'].first['conversations']
+        expect(conversations.pluck('id')).to contain_exactly(origin_conversation.id, other_conversation.id)
+
+        origin_payload = conversations.find { |conversation| conversation['id'] == origin_conversation.id }
+        expect(origin_payload['is_origin']).to be(true)
+        expect(origin_payload['display_id']).to eq(origin_conversation.display_id)
+        expect(origin_payload['status']).to eq(origin_conversation.status)
+        expect(origin_payload['inbox']).to eq(
+          'id' => origin_conversation.inbox.id,
+          'name' => origin_conversation.inbox.name,
+          'channel_type' => origin_conversation.inbox.channel_type
+        )
+        expect(conversations.find { |conversation| conversation['id'] == other_conversation.id }['is_origin']).to be(false)
+      end
+
+      it 'returns an empty conversation list for a deal without conversations' do
+        get "/api/v1/accounts/#{account.id}/crm/deals",
+            headers: admin.create_new_auth_token, as: :json
+
+        expect(response.parsed_body['payload'].first['conversations']).to eq([])
+      end
+
       it 'does not list deals of other accounts' do
         foreign_deal = create(:crm_deal, account: other_account)
 
@@ -174,6 +233,20 @@ RSpec.describe 'CRM Deals API', type: :request do
         expect(response.parsed_body['id']).to eq(deal.id)
         expect(response.parsed_body['title']).to eq('Fazenda Boa Vista')
         expect(response.parsed_body['lock_version']).to eq(deal.lock_version)
+      end
+
+      it 'returns the next activity and the linked conversations of a single deal' do
+        next_task = create(:crm_activity, :task, account: account, deal: deal, due_at: 2.days.from_now)
+        create(:crm_activity, :task, :completed, account: account, deal: deal, due_at: 1.hour.from_now)
+        conversation = create(:conversation, account: account, contact: contact)
+        create(:crm_deal_conversation, :origin, deal: deal, conversation: conversation)
+
+        get "/api/v1/accounts/#{account.id}/crm/deals/#{deal.id}",
+            headers: admin.create_new_auth_token, as: :json
+
+        expect(response.parsed_body['next_activity_at']).to eq(next_task.due_at.to_i)
+        expect(response.parsed_body['conversations'].first['id']).to eq(conversation.id)
+        expect(response.parsed_body['conversations'].first['is_origin']).to be(true)
       end
 
       it 'returns not found for a deal of another account' do

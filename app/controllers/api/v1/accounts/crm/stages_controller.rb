@@ -2,6 +2,7 @@ class Api::V1::Accounts::Crm::StagesController < Api::V1::Accounts::BaseControll
   before_action :fetch_pipeline
   before_action :fetch_stage, only: [:show, :update, :destroy]
   before_action :authorize_stage
+  before_action :set_stage_aggregates, only: [:index, :show, :create, :update]
 
   def index
     @stages = @pipeline.stages.ordered
@@ -33,6 +34,12 @@ class Api::V1::Accounts::Crm::StagesController < Api::V1::Accounts::BaseControll
 
   def fetch_stage
     @stage = @pipeline.stages.find(params[:id])
+  end
+
+  # A single grouped query covering every stage of the pipeline: the board header needs the
+  # totals of the whole stage, and one query per column would not scale.
+  def set_stage_aggregates
+    @stage_aggregates = Crm::StageAggregatesService.new(pipeline: @pipeline, deals_scope: policy_scope(Crm::Deal)).perform
   end
 
   def authorize_stage

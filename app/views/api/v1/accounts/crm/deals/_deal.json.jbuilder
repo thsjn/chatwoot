@@ -11,6 +11,7 @@ json.closed_at resource.closed_at&.to_i
 json.position resource.position
 json.stage_entered_at resource.stage_entered_at&.to_i
 json.last_activity_at resource.last_activity_at&.to_i
+json.next_activity_at resource.next_activity_at&.to_i
 json.lock_version resource.lock_version
 json.archived_at resource.archived_at&.to_i
 json.created_at resource.created_at.to_i
@@ -47,6 +48,23 @@ if resource.source.present?
     json.id resource.source.id
     json.name resource.source.name
     json.kind resource.source.kind
+  end
+end
+
+# The drawer lists every conversation attached to the deal and highlights the one that
+# originated it, so `is_origin` comes from the join row and not from the conversation.
+json.conversations resource.deal_conversations do |deal_conversation|
+  conversation = deal_conversation.conversation
+
+  json.id conversation.id
+  json.display_id conversation.display_id
+  json.is_origin deal_conversation.is_origin
+  json.status conversation.status
+
+  json.inbox do
+    json.id conversation.inbox.id
+    json.name conversation.inbox.name
+    json.channel_type conversation.inbox.channel_type
   end
 end
 

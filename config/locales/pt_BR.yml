@@ -607,6 +607,8 @@ pt_BR:
   automation:
     system_name: 'Sistema de Automação'
   crm:
+    deal:
+      default_title: 'Contato #%{id}'
     no_message: 'Nenhuma mensagem na conversa'
     attachment: '[Anexo: %{type}]'
     no_content: '[Sem conteúdo]'

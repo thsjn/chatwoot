@@ -1,10 +1,15 @@
 class Api::V1::Accounts::Crm::ActivitiesController < Api::V1::Accounts::BaseController
+  RESULTS_PER_PAGE = 25
+
   before_action :fetch_deal
   before_action :fetch_activity, only: [:show, :update, :destroy]
   before_action :authorize_activity
+  before_action :set_current_page, only: [:index]
 
   def index
-    @activities = @deal.activities.chronological.includes(:user)
+    activities = @deal.activities
+    @activities_count = activities.count
+    @activities = activities.chronological.includes(:user).page(@current_page).per(RESULTS_PER_PAGE)
   end
 
   def show; end
@@ -33,6 +38,10 @@ class Api::V1::Accounts::Crm::ActivitiesController < Api::V1::Accounts::BaseCont
 
   def fetch_activity
     @activity = @deal.activities.find(params[:id])
+  end
+
+  def set_current_page
+    @current_page = params[:page] || 1
   end
 
   def authorize_activity

@@ -11,6 +11,7 @@ import helpcenterRoutes from './helpcenter/helpcenter.routes';
 import campaignsRoutes from './campaigns/campaigns.routes';
 import { routes as captainRoutes } from './captain/captain.routes';
 import { routes as kanbanRoutes } from './kanban/kanban.routes';
+import { routes as crmRoutes } from './crm/crm.routes';
 import dashboardAppsRoutes from './dashboardApps/dashboardApps.routes';
 import internalChatRoutes from './internalChat/internalChat.routes';
 import AppContainer from './Dashboard.vue';
@@ -27,6 +28,7 @@ export default {
       children: [
         ...captainRoutes,
         ...kanbanRoutes,
+        ...crmRoutes,
         ...inboxRoutes,
         ...conversation.routes,
         ...settings.routes,

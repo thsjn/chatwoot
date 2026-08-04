@@ -629,6 +629,8 @@ en:
   automation:
     system_name: 'Automation System'
   crm:
+    deal:
+      default_title: 'Contact #%{id}'
     no_message: 'No messages in conversation'
     attachment: '[Attachment: %{type}]'
     no_content: '[No content]'

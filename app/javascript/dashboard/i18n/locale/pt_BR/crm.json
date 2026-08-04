@@ -1,0 +1,102 @@
+{
+  "CRM": {
+    "BOARD": {
+      "TITLE": "Quadro Kanban",
+      "EMPTY_STATE": "Nenhuma oportunidade para exibir",
+      "LOADING": "Carregando oportunidades...",
+      "ADD_DEAL": "Adicionar oportunidade",
+      "SEARCH_PLACEHOLDER": "Buscar oportunidades por título",
+      "LOAD_MORE": "Carregar mais",
+      "DISMISS": "Dispensar"
+    },
+    "FILTERS": {
+      "ALL_SOURCES": "Todas as origens",
+      "ALL_STATUSES": "Todos os status",
+      "STATUS": {
+        "OPEN": "Aberta",
+        "WON": "Ganha",
+        "LOST": "Perdida"
+      }
+    },
+    "PIPELINE": {
+      "SELECT": "Selecionar funil",
+      "NONE": "Nenhum funil",
+      "MANAGE": "Gerenciar funéis"
+    },
+    "STAGE": {
+      "WIP_FULL": "Limite da coluna atingido",
+      "WIP_COUNT": "{count} de {limit}",
+      "EMPTY": "Nenhuma oportunidade neste estágio"
+    },
+    "DEAL": {
+      "VALUE": "Valor da Oportunidade",
+      "OWNER": "Responsável",
+      "NO_OWNER": "Sem responsável atribuído",
+      "CONTACT": "Contato",
+      "SOURCE": "Origem",
+      "EXPECTED_CLOSE": "Data de Fechamento Esperada",
+      "CREATED_AT": "Criada em",
+      "ROTTING": "Parada há {days} dias",
+      "NO_NEXT_ACTIVITY": "Nenhuma próxima atividade agendada",
+      "DETAILS": "Dados da oportunidade",
+      "EDIT_TITLE": "Editar título da oportunidade",
+      "TITLE_PLACEHOLDER": "Título da oportunidade",
+      "CANCEL": "Cancelar",
+      "CLOSE": "Fechar painel da oportunidade",
+      "ARCHIVE": "Arquivar",
+      "ARCHIVE_CONFIRM": "Confirmar arquivamento",
+      "ARCHIVE_HINT": "O card sai do quadro",
+      "ARCHIVE_SUCCESS": "Oportunidade arquivada",
+      "STATUS_OPEN": "Aberta",
+      "STATUS_WON": "Ganha",
+      "STATUS_LOST": "Perdida",
+      "TEAM": "Time",
+      "NO_TEAM": "Sem time atribuído",
+      "NO_SOURCE": "Sem origem",
+      "NO_EMAIL": "Sem e-mail",
+      "NO_PHONE": "Sem telefone",
+      "CONVERSATIONS": "Conversas vinculadas",
+      "NO_CONVERSATIONS": "Nenhuma conversa vinculada a esta oportunidade",
+      "CONVERSATION_ID": "Conversa #{id}",
+      "CONVERSATION_ORIGIN": "Origem",
+      "NEXT_ACTIVITY_HINT": "Agende uma tarefa para esta oportunidade seguir andando",
+      "UPDATE_ERROR": "Não foi possível salvar a oportunidade",
+      "ARCHIVE_ERROR": "Não foi possível arquivar a oportunidade"
+    },
+    "MOVE": {
+      "CONFLICT": "Este card foi atualizado por outro usuário. Atualize a lista.",
+      "WIP_EXCEEDED": "Não é possível mover a oportunidade: limite da coluna excedido",
+      "LOST_REASON_REQUIRED": "Motivo da perda é obrigatório",
+      "GENERIC_ERROR": "Ocorreu um erro ao mover a oportunidade"
+    },
+    "LOST_REASON": {
+      "MODAL_TITLE": "Marcar oportunidade como perdida",
+      "SELECT": "Selecione um motivo",
+      "CONFIRM": "Confirmar",
+      "CANCEL": "Cancelar"
+    },
+    "ACTIVITY": {
+      "TITLE": "Atividade",
+      "ADD": "Adicionar atividade",
+      "KIND": {
+        "NOTE": "Nota",
+        "CALL": "Ligação",
+        "MEETING": "Reunião",
+        "TASK": "Tarefa",
+        "WHATSAPP": "WhatsApp",
+        "SYSTEM": "Sistema"
+      },
+      "DUE_AT": "Data de vencimento",
+      "COMPLETED": "Concluída",
+      "MARK_DONE": "Marcar como feito",
+      "TIMELINE": "Linha do tempo",
+      "EMPTY": "Nenhuma atividade ainda",
+      "NOTE_PLACEHOLDER": "Escreva uma nota...",
+      "TASK_PLACEHOLDER": "O que precisa ser feito?",
+      "OVERDUE": "Vencida",
+      "LOAD_ERROR": "Não foi possível carregar as atividades",
+      "CREATE_ERROR": "Não foi possível criar a atividade",
+      "UPDATE_ERROR": "Não foi possível atualizar a atividade"
+    }
+  }
+}

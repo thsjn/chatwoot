@@ -48,6 +48,32 @@ RSpec.describe 'CRM Deal Activities API', type: :request do
         expect(response).to have_http_status(:success)
       end
 
+      it 'returns the meta with the total count and the current page' do
+        get base_url, headers: admin.create_new_auth_token, as: :json
+
+        expect(response.parsed_body['meta']['count']).to eq(1)
+        expect(response.parsed_body['meta']['current_page']).to eq(1)
+      end
+
+      it 'paginates the timeline' do
+        create_list(:crm_activity, 25, account: account, deal: deal, user: admin)
+
+        get base_url, headers: admin.create_new_auth_token, as: :json
+
+        expect(response.parsed_body['meta']['count']).to eq(26)
+        expect(response.parsed_body['payload'].size).to eq(25)
+        expect(response.parsed_body['payload'].first['id']).to eq(activity.id)
+      end
+
+      it 'returns the requested page' do
+        create_list(:crm_activity, 25, account: account, deal: deal, user: admin)
+
+        get base_url, params: { page: 2 }, headers: admin.create_new_auth_token, as: :json
+
+        expect(response.parsed_body['meta']['current_page']).to eq(2)
+        expect(response.parsed_body['payload'].size).to eq(1)
+      end
+
       it 'does not list activities of another deal' do
         other_deal = create(:crm_deal, account: account, pipeline: pipeline, stage: stage)
         other_activity = create(:crm_activity, account: account, deal: other_deal)

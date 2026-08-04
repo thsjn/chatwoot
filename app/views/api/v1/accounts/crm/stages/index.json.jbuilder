@@ -1,5 +1,5 @@
 json.payload do
   json.array! @stages do |stage|
-    json.partial! 'api/v1/accounts/crm/stages/stage', formats: [:json], resource: stage
+    json.partial! 'api/v1/accounts/crm/stages/stage', formats: [:json], resource: stage, aggregates: @stage_aggregates[stage.id]
   end
 end

@@ -8,7 +8,9 @@ class Api::V1::Accounts::Crm::DealsController < Api::V1::Accounts::BaseControlle
   def index
     deals = filtered_deals
     @deals_count = deals.count
-    @deals = deals.ordered.includes(:contact, :owner, :stage, :source, :lost_reason).page(@current_page).per(RESULTS_PER_PAGE)
+    @deals = deals.ordered.with_next_activity
+                  .includes(:contact, :owner, :team, :stage, :source, :lost_reason, deal_conversations: { conversation: :inbox })
+                  .page(@current_page).per(RESULTS_PER_PAGE)
   end
 
   def show; end
@@ -52,7 +54,7 @@ class Api::V1::Accounts::Crm::DealsController < Api::V1::Accounts::BaseControlle
   end
 
   def fetch_deal
-    @deal = deals.find(params[:id])
+    @deal = deals.includes(deal_conversations: { conversation: :inbox }).find(params[:id])
   end
 
   def authorize_deal

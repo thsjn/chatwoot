@@ -28,6 +28,25 @@ RSpec.describe Crm::Stage do
     end
   end
 
+  describe 'color token' do
+    it 'accepts every token of the closed list' do
+      described_class::COLORS.each do |color|
+        expect(build(:crm_stage, account: account, pipeline: pipeline, color: color)).to be_valid
+      end
+    end
+
+    it 'allows no color' do
+      expect(build(:crm_stage, account: account, pipeline: pipeline, color: nil)).to be_valid
+    end
+
+    it 'rejects a hex value' do
+      stage = build(:crm_stage, account: account, pipeline: pipeline, color: '#ff0000')
+
+      expect(stage).not_to be_valid
+      expect(stage.errors[:color]).to be_present
+    end
+  end
+
   describe 'probability range' do
     it 'accepts the boundaries' do
       expect(build(:crm_stage, account: account, pipeline: pipeline, probability: 0)).to be_valid

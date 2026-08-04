@@ -31,6 +31,10 @@
 class Crm::Stage < ApplicationRecord
   self.table_name = 'crm_stages'
 
+  # `color` is a design token, never a hex value: the dashboard styles the column with Tailwind
+  # utility classes and cannot apply an arbitrary colour coming from the database.
+  COLORS = %w[slate blue emerald amber ruby violet].freeze
+
   belongs_to :account
   belongs_to :pipeline, class_name: 'Crm::Pipeline', inverse_of: :stages
   has_many :deals, class_name: 'Crm::Deal', dependent: :restrict_with_error, inverse_of: :stage
@@ -41,6 +45,7 @@ class Crm::Stage < ApplicationRecord
 
   validates :name, presence: true
   validates :name, uniqueness: { scope: :pipeline_id }
+  validates :color, inclusion: { in: COLORS }, allow_nil: true
   validates :probability, numericality: { only_integer: true, greater_than_or_equal_to: 0, less_than_or_equal_to: 100 }
   validates :rotting_days, numericality: { only_integer: true, greater_than: 0 }, allow_nil: true
   validates :wip_limit, numericality: { only_integer: true, greater_than: 0 }, allow_nil: true

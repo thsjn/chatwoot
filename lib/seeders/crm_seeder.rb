@@ -11,13 +11,14 @@
 class Seeders::CrmSeeder
   DEFAULT_PIPELINE_NAME = 'Vendas'.freeze
 
+  # `color` is a token from `Crm::Stage::COLORS`, mapped to Tailwind classes by the dashboard.
   DEFAULT_STAGES = [
-    { name: 'Novo', category: :open, probability: 10, is_entry: true, rotting_days: 3 },
-    { name: 'Qualificado', category: :open, probability: 25, is_entry: false, rotting_days: 7 },
-    { name: 'Proposta', category: :open, probability: 50, is_entry: false, rotting_days: 10 },
-    { name: 'Negociação', category: :open, probability: 75, is_entry: false, rotting_days: 15 },
-    { name: 'Ganho', category: :won, probability: 100, is_entry: false, rotting_days: nil },
-    { name: 'Perdido', category: :lost, probability: 0, is_entry: false, rotting_days: nil }
+    { name: 'Novo', category: :open, probability: 10, is_entry: true, rotting_days: 3, color: 'slate' },
+    { name: 'Qualificado', category: :open, probability: 25, is_entry: false, rotting_days: 7, color: 'blue' },
+    { name: 'Proposta', category: :open, probability: 50, is_entry: false, rotting_days: 10, color: 'violet' },
+    { name: 'Negociação', category: :open, probability: 75, is_entry: false, rotting_days: 15, color: 'amber' },
+    { name: 'Ganho', category: :won, probability: 100, is_entry: false, rotting_days: nil, color: 'emerald' },
+    { name: 'Perdido', category: :lost, probability: 0, is_entry: false, rotting_days: nil, color: 'ruby' }
   ].freeze
 
   DEFAULT_LOST_REASONS = [
@@ -67,6 +68,7 @@ class Seeders::CrmSeeder
         stage.probability = stage_data[:probability]
         stage.is_entry = stage_data[:is_entry]
         stage.rotting_days = stage_data[:rotting_days]
+        stage.color = stage_data[:color]
         stage.position = (index + 1) * POSITION_STEP
       end
     end

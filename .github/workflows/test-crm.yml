@@ -19,6 +19,10 @@ on:
       - "spec/models/crm/**"
       - "spec/requests/api/v1/accounts/crm/**"
       - "spec/factories/crm_*"
+      - "app/javascript/dashboard/store/crm/**"
+      - "app/javascript/dashboard/api/crm/**"
+      - "app/javascript/dashboard/routes/dashboard/crm/**"
+      - "app/javascript/dashboard/i18n/locale/*/crm.json"
       - ".github/workflows/test-crm.yml"
   workflow_dispatch:
 
@@ -26,6 +30,38 @@ permissions:
   contents: read
 
 jobs:
+  # Roda os specs Vitest do modulo. Fica em job separado do backend porque nao
+  # precisa de Postgres nem Redis: sobe em ~1 min contra os ~3 min do backend.
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm i
+
+      - name: Specs do front do CRM
+        run: |
+          paths=()
+          for dir in app/javascript/dashboard/store/crm \
+                     app/javascript/dashboard/api/crm \
+                     app/javascript/dashboard/routes/dashboard/crm; do
+            if compgen -G "$dir/**/*.spec.js" > /dev/null; then
+              paths+=("$dir")
+            fi
+          done
+          if [ ${#paths[@]} -eq 0 ]; then
+            echo "Nenhum spec de front do CRM ainda — nada a rodar."
+          else
+            TZ=UTC npx vitest run --no-coverage "${paths[@]}"
+          fi
+        shell: bash
+
   backend:
     runs-on: ubuntu-latest
 

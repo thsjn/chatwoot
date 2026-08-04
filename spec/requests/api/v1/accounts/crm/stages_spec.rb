@@ -45,6 +45,56 @@ RSpec.describe 'CRM Stages API', type: :request do
         expect(response).to have_http_status(:success)
       end
 
+      it 'returns the totals of the whole stage, ignoring archived and closed deals' do
+        create(:crm_deal, account: account, pipeline: pipeline, stage: stage, value_cents: 30_000)
+        create(:crm_deal, account: account, pipeline: pipeline, stage: stage, value_cents: 70_000)
+        create(:crm_deal, :archived, account: account, pipeline: pipeline, stage: stage, value_cents: 500_000)
+        create(:crm_deal, :won, account: account, pipeline: pipeline, stage: stage, value_cents: 900_000)
+
+        get "/api/v1/accounts/#{account.id}/crm/pipelines/#{pipeline.id}/stages",
+            headers: admin.create_new_auth_token, as: :json
+
+        payload = response.parsed_body['payload'].find { |stage_payload| stage_payload['id'] == stage.id }
+        expect(payload['deals_count']).to eq(2)
+        expect(payload['deals_value_cents']).to eq(100_000)
+      end
+
+      it 'returns zeroed totals for a stage without deals' do
+        get "/api/v1/accounts/#{account.id}/crm/pipelines/#{pipeline.id}/stages",
+            headers: admin.create_new_auth_token, as: :json
+
+        payload = response.parsed_body['payload'].find { |stage_payload| stage_payload['id'] == stage.id }
+        expect(payload['deals_count']).to eq(0)
+        expect(payload['deals_value_cents']).to eq(0)
+      end
+
+      it 'does not count deals of another stage of the same pipeline' do
+        other_stage = create(:crm_stage, account: account, pipeline: pipeline, position: 2)
+        create(:crm_deal, account: account, pipeline: pipeline, stage: other_stage, value_cents: 45_000)
+        create(:crm_deal, account: account, pipeline: pipeline, stage: stage, value_cents: 15_000)
+
+        get "/api/v1/accounts/#{account.id}/crm/pipelines/#{pipeline.id}/stages",
+            headers: admin.create_new_auth_token, as: :json
+
+        totals = response.parsed_body['payload'].to_h { |stage_payload| [stage_payload['id'], stage_payload['deals_value_cents']] }
+        expect(totals[stage.id]).to eq(15_000)
+        expect(totals[other_stage.id]).to eq(45_000)
+      end
+
+      it 'hides from an agent the totals of deals owned by someone else in a restricted pipeline' do
+        restricted_pipeline = create(:crm_pipeline, :restricted_by_owner, account: account)
+        restricted_stage = create(:crm_stage, account: account, pipeline: restricted_pipeline)
+        create(:crm_deal, account: account, pipeline: restricted_pipeline, stage: restricted_stage, owner: agent, value_cents: 20_000)
+        create(:crm_deal, account: account, pipeline: restricted_pipeline, stage: restricted_stage, owner: admin, value_cents: 80_000)
+
+        get "/api/v1/accounts/#{account.id}/crm/pipelines/#{restricted_pipeline.id}/stages",
+            headers: agent.create_new_auth_token, as: :json
+
+        payload = response.parsed_body['payload'].find { |stage_payload| stage_payload['id'] == restricted_stage.id }
+        expect(payload['deals_count']).to eq(1)
+        expect(payload['deals_value_cents']).to eq(20_000)
+      end
+
       it 'returns not found for a pipeline of another account' do
         foreign_pipeline = create(:crm_pipeline, account: other_account)
 
@@ -75,6 +125,16 @@ RSpec.describe 'CRM Stages API', type: :request do
         expect(response.parsed_body['name']).to eq('Qualificacao')
       end
 
+      it 'returns the totals of the stage' do
+        create(:crm_deal, account: account, pipeline: pipeline, stage: stage, value_cents: 25_000)
+
+        get "/api/v1/accounts/#{account.id}/crm/pipelines/#{pipeline.id}/stages/#{stage.id}",
+            headers: agent.create_new_auth_token, as: :json
+
+        expect(response.parsed_body['deals_count']).to eq(1)
+        expect(response.parsed_body['deals_value_cents']).to eq(25_000)
+      end
+
       it 'returns not found for a stage of another pipeline' do
         other_pipeline = create(:crm_pipeline, account: account)
         other_stage = create(:crm_stage, account: account, pipeline: other_pipeline)
@@ -89,7 +149,7 @@ RSpec.describe 'CRM Stages API', type: :request do
 
   describe 'POST /api/v1/accounts/{account.id}/crm/pipelines/:pipeline_id/stages' do
     let(:valid_params) do
-      { stage: { name: 'Proposta', category: 'open', position: 3, color: '#ff0000', probability: 60, wip_limit: 5, rotting_days: 7 } }
+      { stage: { name: 'Proposta', category: 'open', position: 3, color: 'violet', probability: 60, wip_limit: 5, rotting_days: 7 } }
     end
 
     context 'when unauthenticated' do
@@ -124,9 +184,28 @@ RSpec.describe 'CRM Stages API', type: :request do
         expect(response.parsed_body['name']).to eq('Proposta')
         expect(response.parsed_body['pipeline_id']).to eq(pipeline.id)
         expect(response.parsed_body['wip_limit']).to eq(5)
+        expect(response.parsed_body['color']).to eq('violet')
 
         created = Crm::Stage.find(response.parsed_body['id'])
         expect(created.account_id).to eq(account.id)
+      end
+
+      it 'returns unprocessable entity for a color outside the token list' do
+        expect do
+          post "/api/v1/accounts/#{account.id}/crm/pipelines/#{pipeline.id}/stages",
+               params: { stage: { name: 'Invalida', color: '#ff0000' } },
+               headers: admin.create_new_auth_token, as: :json
+        end.not_to change(Crm::Stage, :count)
+
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
+
+      it 'accepts a stage without a color' do
+        post "/api/v1/accounts/#{account.id}/crm/pipelines/#{pipeline.id}/stages",
+             params: { stage: { name: 'Sem cor' } }, headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['color']).to be_nil
       end
 
       it 'returns unprocessable entity for an invalid probability' do

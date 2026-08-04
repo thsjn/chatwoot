@@ -67,6 +67,20 @@ class Crm::Deal < ApplicationRecord
   # in background with evenly spaced multiples of POSITION_GAP.
   POSITION_GAP = 1000
 
+  # The board card shows whether the deal has a next step scheduled, and a listing renders 25
+  # cards per column: resolving that per record would be one query per card. This correlated
+  # subquery rides along the listing query as an extra column (see the `with_next_activity`
+  # scope) and is covered by `index_crm_activities_on_deal_id`.
+  # `now() AT TIME ZONE 'UTC'` matches the `timestamp without time zone` columns Rails writes
+  # in UTC, so the comparison does not depend on the Postgres session timezone.
+  NEXT_ACTIVITY_AT_SQL = <<~SQL.squish.freeze
+    (SELECT MIN(crm_activities.due_at)
+       FROM crm_activities
+      WHERE crm_activities.deal_id = crm_deals.id
+        AND crm_activities.completed_at IS NULL
+        AND crm_activities.due_at > (now() AT TIME ZONE 'UTC')) AS next_activity_at
+  SQL
+
   # `lock_version` enables Rails optimistic locking out of the box (the column name must
   # be exactly this). Two agents dragging the same card concurrently make the second save
   # raise ActiveRecord::StaleObjectError instead of silently overwriting the first.
@@ -113,6 +127,7 @@ class Crm::Deal < ApplicationRecord
   scope :archived, -> { where.not(archived_at: nil) }
   scope :ordered, -> { order(:position, :id) }
   scope :in_stage, ->(stage_id) { where(stage_id: stage_id).ordered }
+  scope :with_next_activity, -> { select('crm_deals.*', Arel.sql(NEXT_ACTIVITY_AT_SQL)) }
   scope :rotting, lambda {
     open.active
         .joins(:stage)
@@ -138,6 +153,15 @@ class Crm::Deal < ApplicationRecord
 
   def origin_conversation
     deal_conversations.find_by(is_origin: true)&.conversation
+  end
+
+  # Earliest due date still ahead of us among the activities nobody completed yet, which is
+  # what the "every open deal needs a next step" rule is checked against. Listings load it
+  # through `with_next_activity`; a single record (show/create/update) resolves it here.
+  def next_activity_at
+    return self[:next_activity_at] if has_attribute?(:next_activity_at)
+
+    activities.pending.where(due_at: Time.current..).minimum(:due_at)
   end
 
   private
