@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_18_000000) do
+ActiveRecord::Schema[7.1].define(version: 2026_08_04_140000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -454,8 +454,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_18_000000) do
     t.integer "status", default: 0, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["account_id"], name: "index_captain_faq_suggestions_on_account_id"
     t.index ["account_id", "assistant_id", "status", "language"], name: "idx_cap_faq_suggestions_on_account_assistant_status_language"
+    t.index ["account_id"], name: "index_captain_faq_suggestions_on_account_id"
     t.index ["assistant_id"], name: "index_captain_faq_suggestions_on_assistant_id"
     t.index ["embedding"], name: "vector_idx_captain_faq_suggestions_embedding", opclass: :vector_cosine_ops, using: :ivfflat
   end
@@ -695,8 +695,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_18_000000) do
     t.jsonb "phone_number_health", default: {}, null: false
     t.datetime "phone_number_health_checked_at"
     t.string "phone_number_health_error", limit: 500
-    t.index ["phone_number_health_checked_at"], name: "index_channel_whatsapp_on_phone_number_health_checked_at"
     t.index ["phone_number"], name: "index_channel_whatsapp_on_phone_number", unique: true
+    t.index ["phone_number_health_checked_at"], name: "index_channel_whatsapp_on_phone_number_health_checked_at"
     t.index ["provider_connection"], name: "index_channel_whatsapp_provider_connection", where: "((provider)::text = ANY (ARRAY[('baileys'::character varying)::text, ('zapi'::character varying)::text]))", using: :gin
   end
 
@@ -847,6 +847,158 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_18_000000) do
     t.index ["account_id"], name: "index_copilot_threads_on_account_id"
     t.index ["assistant_id"], name: "index_copilot_threads_on_assistant_id"
     t.index ["user_id"], name: "index_copilot_threads_on_user_id"
+  end
+
+  create_table "crm_activities", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "deal_id", null: false
+    t.bigint "user_id"
+    t.integer "kind", default: 0, null: false
+    t.text "content"
+    t.datetime "due_at"
+    t.datetime "completed_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "due_at"], name: "index_crm_activities_on_account_id_and_due_at"
+    t.index ["account_id"], name: "index_crm_activities_on_account_id"
+    t.index ["deal_id", "created_at"], name: "index_crm_activities_on_deal_id_and_created_at"
+    t.index ["deal_id", "due_at"], name: "index_crm_activities_pending_on_deal_id_and_due_at", where: "(completed_at IS NULL)"
+    t.index ["deal_id"], name: "index_crm_activities_on_deal_id"
+    t.index ["user_id"], name: "index_crm_activities_on_user_id"
+  end
+
+  create_table "crm_deal_conversations", force: :cascade do |t|
+    t.bigint "deal_id", null: false
+    t.bigint "conversation_id", null: false
+    t.boolean "is_origin", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["conversation_id"], name: "index_crm_deal_conversations_on_conversation_id"
+    t.index ["deal_id", "conversation_id"], name: "index_crm_deal_conversations_on_deal_and_conversation", unique: true
+    t.index ["deal_id"], name: "index_crm_deal_conversations_on_deal_id"
+  end
+
+  create_table "crm_deals", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "pipeline_id", null: false
+    t.bigint "stage_id", null: false
+    t.bigint "contact_id", null: false
+    t.string "title", null: false
+    t.bigint "value_cents", default: 0, null: false
+    t.string "currency", default: "BRL", null: false
+    t.integer "status", default: 0, null: false
+    t.bigint "owner_id"
+    t.bigint "team_id"
+    t.bigint "source_id"
+    t.bigint "source_inbox_id"
+    t.jsonb "utm", default: {}, null: false
+    t.jsonb "custom_attributes", default: {}, null: false
+    t.date "expected_close_on"
+    t.datetime "closed_at"
+    t.bigint "lost_reason_id"
+    t.decimal "position", default: "0.0", null: false
+    t.datetime "stage_entered_at"
+    t.datetime "last_activity_at"
+    t.integer "lock_version", default: 0, null: false
+    t.datetime "archived_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "archived_at"], name: "index_crm_deals_on_account_id_and_archived_at"
+    t.index ["account_id", "pipeline_id", "closed_at"], name: "index_crm_deals_active_on_account_pipeline_closed", where: "(archived_at IS NULL)"
+    t.index ["account_id", "pipeline_id", "created_at"], name: "index_crm_deals_active_on_account_pipeline_created", where: "(archived_at IS NULL)"
+    t.index ["account_id", "pipeline_id", "expected_close_on"], name: "index_crm_deals_active_on_account_pipeline_close_on", where: "(archived_at IS NULL)"
+    t.index ["account_id", "pipeline_id", "stage_id"], name: "index_crm_deals_on_account_pipeline_stage"
+    t.index ["account_id", "status"], name: "index_crm_deals_on_account_id_and_status"
+    t.index ["account_id"], name: "index_crm_deals_on_account_id"
+    t.index ["contact_id"], name: "index_crm_deals_on_contact_id"
+    t.index ["lost_reason_id"], name: "index_crm_deals_on_lost_reason_id"
+    t.index ["owner_id"], name: "index_crm_deals_on_owner_id"
+    t.index ["pipeline_id", "status", "stage_id"], name: "index_crm_deals_active_on_pipeline_status_stage", where: "(archived_at IS NULL)"
+    t.index ["pipeline_id"], name: "index_crm_deals_on_pipeline_id"
+    t.index ["source_id"], name: "index_crm_deals_on_source_id"
+    t.index ["source_inbox_id"], name: "index_crm_deals_on_source_inbox_id"
+    t.index ["stage_id", "position", "id"], name: "index_crm_deals_active_on_stage_position", where: "(archived_at IS NULL)"
+    t.index ["stage_id", "position"], name: "index_crm_deals_on_stage_id_and_position"
+    t.index ["stage_id"], name: "index_crm_deals_on_stage_id"
+    t.index ["team_id"], name: "index_crm_deals_on_team_id"
+  end
+
+  create_table "crm_lost_reasons", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "name", null: false
+    t.integer "position", default: 0, null: false
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "position"], name: "index_crm_lost_reasons_on_account_id_and_position"
+    t.index ["account_id"], name: "index_crm_lost_reasons_on_account_id"
+  end
+
+  create_table "crm_pipelines", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "name", null: false
+    t.text "description"
+    t.integer "position", default: 0, null: false
+    t.boolean "is_default", default: false, null: false
+    t.jsonb "settings", default: {}, null: false
+    t.datetime "archived_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "archived_at"], name: "index_crm_pipelines_on_account_id_and_archived_at"
+    t.index ["account_id", "position"], name: "index_crm_pipelines_on_account_id_and_position"
+    t.index ["account_id"], name: "index_crm_pipelines_on_account_id"
+    t.index ["account_id"], name: "index_crm_pipelines_on_account_id_default", unique: true, where: "(is_default = true)"
+  end
+
+  create_table "crm_sources", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "name", null: false
+    t.integer "kind", default: 0, null: false
+    t.bigint "inbox_id"
+    t.string "identifier"
+    t.string "token_digest"
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "identifier"], name: "index_crm_sources_on_account_id_and_identifier"
+    t.index ["account_id", "kind"], name: "index_crm_sources_on_account_id_and_kind"
+    t.index ["account_id"], name: "index_crm_sources_on_account_id"
+    t.index ["inbox_id"], name: "index_crm_sources_on_inbox_id"
+  end
+
+  create_table "crm_stage_transitions", force: :cascade do |t|
+    t.bigint "deal_id", null: false
+    t.bigint "from_stage_id"
+    t.bigint "to_stage_id", null: false
+    t.bigint "user_id"
+    t.integer "duration_seconds"
+    t.boolean "automated", default: false, null: false
+    t.datetime "created_at", null: false
+    t.index ["deal_id", "created_at"], name: "index_crm_stage_transitions_on_deal_id_and_created_at"
+    t.index ["deal_id", "to_stage_id"], name: "index_crm_stage_transitions_on_deal_id_and_to_stage"
+    t.index ["deal_id"], name: "index_crm_stage_transitions_on_deal_id"
+    t.index ["from_stage_id"], name: "index_crm_stage_transitions_on_from_stage_id"
+    t.index ["to_stage_id"], name: "index_crm_stage_transitions_on_to_stage_id"
+    t.index ["user_id"], name: "index_crm_stage_transitions_on_user_id"
+  end
+
+  create_table "crm_stages", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "pipeline_id", null: false
+    t.string "name", null: false
+    t.integer "position", default: 0, null: false
+    t.string "color"
+    t.integer "category", default: 0, null: false
+    t.integer "probability", default: 0, null: false
+    t.integer "rotting_days"
+    t.integer "wip_limit"
+    t.boolean "is_entry", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "category"], name: "index_crm_stages_on_account_id_and_category"
+    t.index ["account_id"], name: "index_crm_stages_on_account_id"
+    t.index ["pipeline_id", "position"], name: "index_crm_stages_on_pipeline_id_and_position"
+    t.index ["pipeline_id"], name: "index_crm_stages_on_pipeline_id"
   end
 
   create_table "csat_survey_responses", force: :cascade do |t|
@@ -1010,10 +1162,10 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_18_000000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.integer "inbox_id"
-    t.index ["account_id", "name", "template_type", "locale"], name: "index_email_templates_on_account_scope", unique: true, where: "(account_id IS NOT NULL) AND (inbox_id IS NULL)"
+    t.index ["account_id", "name", "template_type", "locale"], name: "index_email_templates_on_account_scope", unique: true, where: "((account_id IS NOT NULL) AND (inbox_id IS NULL))"
     t.index ["inbox_id", "name", "template_type", "locale"], name: "index_email_templates_on_inbox_scope", unique: true, where: "(inbox_id IS NOT NULL)"
     t.index ["inbox_id"], name: "index_email_templates_on_inbox_id"
-    t.index ["name", "template_type", "locale"], name: "index_email_templates_on_installation_scope", unique: true, where: "(account_id IS NULL) AND (inbox_id IS NULL)"
+    t.index ["name", "template_type", "locale"], name: "index_email_templates_on_installation_scope", unique: true, where: "((account_id IS NULL) AND (inbox_id IS NULL))"
   end
 
   create_table "folders", force: :cascade do |t|
@@ -1750,6 +1902,30 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_18_000000) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "crm_activities", "accounts", on_delete: :cascade
+  add_foreign_key "crm_activities", "crm_deals", column: "deal_id", on_delete: :cascade
+  add_foreign_key "crm_activities", "users", on_delete: :nullify
+  add_foreign_key "crm_deal_conversations", "conversations", on_delete: :cascade
+  add_foreign_key "crm_deal_conversations", "crm_deals", column: "deal_id", on_delete: :cascade
+  add_foreign_key "crm_deals", "accounts", on_delete: :cascade
+  add_foreign_key "crm_deals", "contacts", on_delete: :cascade
+  add_foreign_key "crm_deals", "crm_lost_reasons", column: "lost_reason_id", on_delete: :nullify
+  add_foreign_key "crm_deals", "crm_pipelines", column: "pipeline_id"
+  add_foreign_key "crm_deals", "crm_sources", column: "source_id", on_delete: :nullify
+  add_foreign_key "crm_deals", "crm_stages", column: "stage_id"
+  add_foreign_key "crm_deals", "inboxes", column: "source_inbox_id", on_delete: :nullify
+  add_foreign_key "crm_deals", "teams", on_delete: :nullify
+  add_foreign_key "crm_deals", "users", column: "owner_id", on_delete: :nullify
+  add_foreign_key "crm_lost_reasons", "accounts", on_delete: :cascade
+  add_foreign_key "crm_pipelines", "accounts", on_delete: :cascade
+  add_foreign_key "crm_sources", "accounts", on_delete: :cascade
+  add_foreign_key "crm_sources", "inboxes", on_delete: :nullify
+  add_foreign_key "crm_stage_transitions", "crm_deals", column: "deal_id", on_delete: :cascade
+  add_foreign_key "crm_stage_transitions", "crm_stages", column: "from_stage_id", on_delete: :nullify
+  add_foreign_key "crm_stage_transitions", "crm_stages", column: "to_stage_id"
+  add_foreign_key "crm_stage_transitions", "users", on_delete: :nullify
+  add_foreign_key "crm_stages", "accounts", on_delete: :cascade
+  add_foreign_key "crm_stages", "crm_pipelines", column: "pipeline_id", on_delete: :cascade
   add_foreign_key "group_members", "contacts"
   add_foreign_key "group_members", "contacts", column: "group_contact_id"
   add_foreign_key "inboxes", "portals"
