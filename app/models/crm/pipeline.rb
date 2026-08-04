@@ -36,8 +36,11 @@ class Crm::Pipeline < ApplicationRecord
   SETTINGS_KEYS = %w[inbox_ids janela_dedupe_dias exige_proxima_atividade moeda_padrao restrito_por_owner].freeze
 
   belongs_to :account
-  has_many :stages, class_name: 'Crm::Stage', dependent: :destroy_async, inverse_of: :pipeline
+  # Order matters: Rails runs the `dependent:` callbacks in declaration order, so the restrictive
+  # association has to come FIRST. Declared after `stages`, the destroy of a pipeline still holding
+  # deals would enqueue the stage destruction job before being refused. Do not reorder.
   has_many :deals, class_name: 'Crm::Deal', dependent: :restrict_with_error, inverse_of: :pipeline
+  has_many :stages, class_name: 'Crm::Stage', dependent: :destroy_async, inverse_of: :pipeline
 
   validates :name, presence: true
   validates :name, uniqueness: { scope: :account_id }

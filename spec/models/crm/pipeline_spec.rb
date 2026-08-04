@@ -94,5 +94,16 @@ RSpec.describe Crm::Pipeline do
       expect(pipeline.destroy).to be(false)
       expect(pipeline.errors[:base]).to be_present
     end
+
+    # Rails runs the `dependent:` callbacks in declaration order, so the restrictive `deals`
+    # association has to be declared before the `destroy_async` on `stages`.
+    it 'does not enqueue the async destruction of the stages when the destroy is refused' do
+      pipeline = create(:crm_pipeline, account: account)
+      stage = create(:crm_stage, account: account, pipeline: pipeline)
+      create(:crm_deal, account: account, pipeline: pipeline, stage: stage)
+
+      expect { pipeline.destroy }.not_to have_enqueued_job(ActiveRecord::DestroyAssociationAsyncJob)
+      expect(Crm::Stage.exists?(stage.id)).to be(true)
+    end
   end
 end

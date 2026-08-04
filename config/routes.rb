@@ -189,6 +189,18 @@ Rails.application.routes.draw do
             end
           end
 
+          namespace :crm do
+            resources :pipelines, only: [:index, :show, :create, :update, :destroy] do
+              resources :stages, only: [:index, :show, :create, :update, :destroy]
+            end
+            resources :deals, only: [:index, :show, :create, :update, :destroy] do
+              patch :move, on: :member
+              resources :activities, only: [:index, :show, :create, :update, :destroy]
+            end
+            resources :sources, only: [:index, :show, :create, :update, :destroy]
+            resources :lost_reasons, only: [:index, :show, :create, :update, :destroy]
+          end
+
           namespace :internal_chat do
             resource :search, only: [:show], controller: 'search'
             resources :categories, only: [:index, :create, :update, :destroy]
