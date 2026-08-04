@@ -10,11 +10,16 @@ on:
   push:
     branches: [crm]
     paths:
-      - "app/models/crm/**"
-      - "app/controllers/api/v1/accounts/crm/**"
-      - "app/policies/crm/**"
-      - "app/views/api/v1/accounts/crm/**"
+      # Qualquer caminho do modulo. Ja aconteceu duas vezes de um arquivo real
+      # ficar fora desta lista e o CI passar sem executar nada: prefira o glob
+      # largo a enumerar diretorio por diretorio.
+      - "**/crm/**"
+      - "app/models/concerns/crm/**"
+      - "app/controllers/concerns/crm/**"
       - "app/listeners/crm_listener.rb"
+      - "app/listeners/action_cable_listener.rb"
+      - "app/javascript/dashboard/helper/actionCable.js"
+      - "lib/events/types.rb"
       - "db/migrate/**"
       - "app/services/crm/**"
       - "app/jobs/crm/**"
