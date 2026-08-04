@@ -377,6 +377,7 @@
       "STATUS_OPEN": "Aberta",
       "STATUS_WON": "Ganha",
       "STATUS_LOST": "Perdida",
+      "LOST_REASON": "Motivo da perda",
       "TEAM": "Time",
       "NO_TEAM": "Sem time atribuído",
       "NO_SOURCE": "Sem origem",

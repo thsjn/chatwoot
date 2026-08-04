@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useLocale } from 'shared/composables/useLocale';
+import { useCrmBoardStore } from 'dashboard/store/crm/board';
 
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
@@ -15,6 +16,9 @@ const props = defineProps({
 
 const { t } = useI18n();
 const { resolvedLocale } = useLocale();
+const boardStore = useCrmBoardStore();
+
+const DEFAULT_CURRENCY = 'BRL';
 
 const SECONDS_IN_A_DAY = 86400;
 
@@ -41,10 +45,16 @@ const rottingClass = computed(() =>
     : 'bg-n-amber-3 text-n-amber-11'
 );
 
+// Realtime pushes merge the websocket payload over the existing card (see
+// `applyRealtimeDeal` in the board store) and may omit `currency`, so the pipeline's
+// currency stands in first, same fallback `BoardColumn` uses for its totals.
 const formattedValue = computed(() =>
   new Intl.NumberFormat(resolvedLocale.value, {
     style: 'currency',
-    currency: props.deal.currency,
+    currency:
+      props.deal.currency ||
+      boardStore.getSelectedPipeline?.settings?.moeda_padrao ||
+      DEFAULT_CURRENCY,
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format((props.deal.value_cents || 0) / 100)

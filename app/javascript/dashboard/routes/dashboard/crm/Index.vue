@@ -135,6 +135,18 @@ const isEmptyBoard = computed(
   () => !uiFlags.value.fetchingDeals && !stages.value.length
 );
 
+// Stages resolve before their cards do (`selectPipeline` awaits `fetchStages` then
+// `fetchBoardDeals`), so right after picking a pipeline the columns exist but every one
+// of them is empty. Without this, each column would flash its own "no deals" message
+// before the first page lands — this is the one moment `CRM.BOARD.LOADING` earns its
+// keep, distinguishing "still loading" from "genuinely empty stage".
+const hasLoadedAnyDeal = computed(() =>
+  stages.value.some(stage => store.getDealsByStage(stage.id).length)
+);
+const isBoardLoading = computed(
+  () => uiFlags.value.fetchingDeals && !hasLoadedAnyDeal.value
+);
+
 const applyFilters = useDebounceFn(() => {
   store.setFilters({
     ...(searchQuery.value.trim() ? { q: searchQuery.value.trim() } : {}),
@@ -279,6 +291,12 @@ onMounted(async () => {
       class="flex items-center justify-center flex-1 text-sm text-n-slate-11"
     >
       {{ t('CRM.BOARD.EMPTY_STATE') }}
+    </div>
+    <div
+      v-else-if="isBoardLoading"
+      class="flex items-center justify-center flex-1 text-sm text-n-slate-11"
+    >
+      {{ t('CRM.BOARD.LOADING') }}
     </div>
     <div v-else class="flex flex-1 min-h-0 gap-4 px-6 py-4 overflow-x-auto">
       <BoardColumn

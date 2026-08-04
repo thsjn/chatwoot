@@ -165,6 +165,28 @@ describe('DealDrawer.vue', () => {
     expect(wrapper.text()).toContain('Lost');
   });
 
+  it('shows the lost reason on a lost deal', async () => {
+    seed(
+      buildDeal({
+        status: 'lost',
+        stage_id: 20,
+        lost_reason: { id: 55, name: 'Price too high' },
+      })
+    );
+    const wrapper = mountDrawer();
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Lost reason');
+    expect(wrapper.text()).toContain('Price too high');
+  });
+
+  it('says nothing about a lost reason on an open deal', async () => {
+    const wrapper = mountDrawer();
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain('Lost reason');
+  });
+
   it('archives the deal only after the confirmation step', async () => {
     const archiveDeal = vi.spyOn(store, 'archiveDeal').mockResolvedValue();
     const wrapper = mountDrawer();

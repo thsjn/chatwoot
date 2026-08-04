@@ -1,5 +1,18 @@
+import { setActivePinia, createPinia } from 'pinia';
 import { mount } from '@vue/test-utils';
+
+import { useCrmBoardStore } from 'dashboard/store/crm/board';
 import DealCard from '../DealCard.vue';
+
+vi.mock('dashboard/api/crm/deals', () => ({ default: { get: vi.fn() } }));
+vi.mock('dashboard/api/crm/pipelines', () => ({ default: { get: vi.fn() } }));
+vi.mock('dashboard/api/crm/stages', () => ({
+  default: { getStages: vi.fn() },
+}));
+vi.mock('dashboard/api/crm/lostReasons', () => ({
+  default: { get: vi.fn() },
+}));
+vi.mock('dashboard/api/crm/sources', () => ({ default: { get: vi.fn() } }));
 
 const SECONDS_IN_A_DAY = 86400;
 const nowInSeconds = () => Math.floor(Date.now() / 1000);
@@ -26,6 +39,33 @@ const rottingBadge = wrapper =>
   wrapper.findAll('span').find(node => node.text().startsWith('Inactive'));
 
 describe('DealCard.vue', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  // Realtime pushes merge over the existing card and can omit `currency` (see
+  // `applyRealtimeDeal` in the board store); `Intl.NumberFormat` throws on
+  // `currency: undefined`, so the card must fall back instead of crashing.
+  it('falls back to the pipeline currency when the deal has none', () => {
+    const store = useCrmBoardStore();
+    store.pipelines = [{ id: 1, settings: { moeda_padrao: 'USD' } }];
+    store.selectedPipelineId = 1;
+
+    const wrapper = mountCard({
+      deal: buildDeal({ currency: undefined }),
+    });
+
+    expect(wrapper.text()).toContain('$');
+  });
+
+  it('falls back to BRL when neither the deal nor the pipeline carry a currency', () => {
+    const wrapper = mountCard({
+      deal: buildDeal({ currency: undefined }),
+    });
+
+    expect(wrapper.text()).toContain('R$');
+  });
+
   it('renders the title, the formatted value and the contact', () => {
     const wrapper = mountCard();
 

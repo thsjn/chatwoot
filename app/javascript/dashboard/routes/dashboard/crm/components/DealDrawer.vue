@@ -93,13 +93,21 @@ const stage = computed(
 
 const isArchived = computed(() => Boolean(deal.value?.archived_at));
 
+const DEFAULT_CURRENCY = 'BRL';
+
+// Same fallback as `DealCard`/`BoardColumn`: a realtime merge can leave `currency`
+// out of the deal, so the selected pipeline's currency stands in before the hard
+// default, instead of letting `Intl.NumberFormat` throw on `undefined`.
 const dealValue = computed(() => {
   const currentDeal = deal.value;
   if (!currentDeal) return '';
 
   return new Intl.NumberFormat(undefined, {
     style: 'currency',
-    currency: currentDeal.currency || 'USD',
+    currency:
+      currentDeal.currency ||
+      boardStore.getSelectedPipeline?.settings?.moeda_padrao ||
+      DEFAULT_CURRENCY,
   }).format((currentDeal.value_cents || 0) / 100);
 });
 
@@ -446,6 +454,15 @@ onMounted(() => {
                 {{ $t('CRM.DEAL.ARCHIVED_BADGE') }}
               </span>
             </div>
+
+            <!-- Read only: changing the reason means moving the card through the lost
+            stage again, the update endpoint does not accept it. -->
+            <p
+              v-if="deal.status === 'lost' && deal.lost_reason"
+              class="mb-0 mt-1 text-xs text-n-slate-11"
+            >
+              {{ $t('CRM.DEAL.LOST_REASON') }}: {{ deal.lost_reason.name }}
+            </p>
           </div>
 
           <div class="flex shrink-0 items-center gap-2">

@@ -377,6 +377,7 @@
       "STATUS_OPEN": "Open",
       "STATUS_WON": "Won",
       "STATUS_LOST": "Lost",
+      "LOST_REASON": "Lost reason",
       "TEAM": "Team",
       "NO_TEAM": "No team assigned",
       "NO_SOURCE": "No source",
