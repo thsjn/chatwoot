@@ -92,11 +92,15 @@ jobs:
 
       - name: Specs do CRM
         run: |
-          if compgen -G "spec/models/crm/*_spec.rb" > /dev/null || \
-             compgen -G "spec/requests/api/v1/accounts/crm/*_spec.rb" > /dev/null; then
-            bundle exec rspec spec/models/crm spec/requests/api/v1/accounts/crm \
-              --format progress
-          else
+          paths=()
+          for dir in spec/models/crm spec/policies/crm spec/requests/api/v1/accounts/crm; do
+            if compgen -G "$dir/*_spec.rb" > /dev/null; then
+              paths+=("$dir")
+            fi
+          done
+          if [ ${#paths[@]} -eq 0 ]; then
             echo "Nenhum spec de CRM ainda — nada a rodar."
+          else
+            bundle exec rspec "${paths[@]}" --format progress
           fi
         shell: bash
