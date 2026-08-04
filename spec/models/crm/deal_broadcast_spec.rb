@@ -91,4 +91,69 @@ RSpec.describe Crm::Deal do
       expect(deal.push_event_data).to include(owner: nil, team: nil, source: nil, lost_reason: nil)
     end
   end
+
+  # The payload is an ARGUMENT of `ActionCableBroadcastJob`, and Sidekiq's client refuses to enqueue
+  # a job whose arguments are not native JSON types. That check never ran here before: the test
+  # environment enqueues with the `:test` adapter, which serializes nothing, so a payload carrying
+  # the `BigDecimal` of `crm_deals.position` passed every example and still 500'd every deal write
+  # in staging — after the row had already been committed, since the dispatch is `after_*_commit`.
+  #
+  # So these examples do not reimplement the rule: they hand the payload to the real Sidekiq client
+  # (in fake mode, so nothing touches Redis) and let `Sidekiq::JobUtil#verify_json` walk it, which is
+  # the same recursive native-JSON-type check the deploy runs.
+  describe '#push_event_data as a job argument' do
+    let(:enqueue_broadcast) do
+      lambda do |payload|
+        previous_adapter = ActiveJob::Base.queue_adapter
+        ActiveJob::Base.queue_adapter = :sidekiq
+        begin
+          Sidekiq::Testing.fake! { ActionCableBroadcastJob.perform_later(['pubsub-token'], 'crm_deal.updated', payload) }
+        ensure
+          Sidekiq::Queues.clear_all
+          ActiveJob::Base.queue_adapter = previous_adapter
+        end
+      end
+    end
+
+    # A card dropped between two neighbours gets the average of their positions, so a fractional
+    # `position` is the normal state of a board that has been used, not an edge case.
+    it 'enqueues a card whose position is fractional' do
+      deal = create(:crm_deal, account: account, pipeline: pipeline, stage: stage, contact: contact, position: 1234.5)
+
+      expect { enqueue_broadcast.call(deal.push_event_data) }.not_to raise_error
+      expect(deal.push_event_data[:position]).to eq(1234.5).and be_a(Float)
+    end
+
+    # `custom_attributes` is jsonb of free content: whatever the account defines as a deal field
+    # ends up inside the payload, so the normalization has to reach into it and not only the columns.
+    it 'enqueues a card whose custom attributes carry a number and a date' do
+      create(:custom_attribute_definition, account: account, attribute_model: :deal_attribute,
+                                           attribute_key: 'hectares', attribute_display_type: :number)
+      create(:custom_attribute_definition, account: account, attribute_model: :deal_attribute,
+                                           attribute_key: 'visita_em', attribute_display_type: :date)
+      deal = create(:crm_deal, account: account, pipeline: pipeline, stage: stage, contact: contact,
+                               custom_attributes: { 'hectares' => 1250.75, 'visita_em' => '2026-08-20' })
+
+      expect { enqueue_broadcast.call(deal.push_event_data) }.not_to raise_error
+      expect(deal.push_event_data[:custom_attributes]).to eq('hectares' => 1250.75, 'visita_em' => '2026-08-20')
+    end
+
+    it 'enqueues a card whose utm is populated' do
+      deal = create(:crm_deal, account: account, pipeline: pipeline, stage: stage, contact: contact,
+                               utm: { 'source' => 'meta', 'campaign_id' => 120_215_000, 'spend' => 42.5 })
+
+      expect { enqueue_broadcast.call(deal.push_event_data) }.not_to raise_error
+    end
+
+    # `expected_close_on` is a `date` column, so `attributes` hands back a `Date` object. It only
+    # survived the wire because ActiveJob happens to have a serializer for it; the board reads the
+    # same "YYYY-MM-DD" string the jbuilder partial serves, and the store MERGES this over the card.
+    it 'enqueues a card with an expected close date, as the string the board already reads' do
+      deal = create(:crm_deal, account: account, pipeline: pipeline, stage: stage, contact: contact,
+                               expected_close_on: Date.new(2026, 8, 20))
+
+      expect { enqueue_broadcast.call(deal.push_event_data) }.not_to raise_error
+      expect(deal.push_event_data[:expected_close_on]).to eq('2026-08-20')
+    end
+  end
 end

@@ -26,13 +26,54 @@ RSpec.describe Crm::Pipeline do
     end
   end
 
-  describe 'default pipeline uniqueness' do
-    it 'rejects a second default pipeline on the same account' do
-      create(:crm_pipeline, :default, account: account)
-      second_default = build(:crm_pipeline, :default, account: account)
+  # Marking a funnel as the default takes the flag away from the previous one instead of being
+  # refused: the switch on the administration screen is a single step.
+  describe 'default pipeline swap' do
+    it 'takes the default away from the previous pipeline when another one is marked' do
+      previous = create(:crm_pipeline, :default, account: account)
+      other = create(:crm_pipeline, account: account)
 
-      expect(second_default).not_to be_valid
-      expect(second_default.errors[:is_default]).to be_present
+      other.update!(is_default: true)
+
+      expect(other.reload.is_default).to be(true)
+      expect(previous.reload.is_default).to be(false)
+    end
+
+    it 'takes the default away from the previous pipeline when a new default is created' do
+      previous = create(:crm_pipeline, :default, account: account)
+
+      created = create(:crm_pipeline, :default, account: account)
+
+      expect(created.reload.is_default).to be(true)
+      expect(previous.reload.is_default).to be(false)
+    end
+
+    # `index_crm_pipelines_on_account_id_default` is a partial UNIQUE index, so the account is
+    # never left holding two defaults — not even for the instant between the two writes.
+    it 'never leaves the account with more than one default' do
+      create(:crm_pipeline, :default, account: account)
+      create(:crm_pipeline, :default, account: account)
+      create(:crm_pipeline, account: account).update!(is_default: true)
+
+      expect(described_class.where(account_id: account.id, is_default: true).count).to eq(1)
+    end
+
+    it 'leaves the default of another account untouched' do
+      foreign_default = create(:crm_pipeline, :default, account: create(:account))
+
+      create(:crm_pipeline, :default, account: account)
+
+      expect(foreign_default.reload.is_default).to be(true)
+    end
+
+    # The swap only runs when the flag actually changes, so re-saving the current default must not
+    # clear the row it is about to write.
+    it 'keeps the flag when the current default is saved again' do
+      default_pipeline = create(:crm_pipeline, :default, account: account)
+
+      default_pipeline.update!(name: 'Comercial 2026')
+
+      expect(default_pipeline.reload.is_default).to be(true)
     end
 
     it 'allows a default pipeline per account' do

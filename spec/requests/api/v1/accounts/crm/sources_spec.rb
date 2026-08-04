@@ -147,6 +147,27 @@ RSpec.describe 'CRM Sources API', type: :request do
         expect(Crm::Source.find(response.parsed_body['id']).account_id).to eq(account.id)
       end
 
+      # The dialog ships the switch on and sends `active`, but the column default is what answers
+      # for every other caller, so a payload without the flag has to create an ACTIVE source.
+      it 'creates the source active when the payload omits the flag' do
+        post "/api/v1/accounts/#{account.id}/crm/sources",
+             params: { source: { name: 'Origem sem flag', kind: 'manual' } },
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['active']).to be(true)
+        expect(Crm::Source.find(response.parsed_body['id']).active).to be(true)
+      end
+
+      it 'creates the source inactive when the switch is off' do
+        post "/api/v1/accounts/#{account.id}/crm/sources",
+             params: { source: { name: 'Origem desligada', kind: 'manual', active: false } },
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['active']).to be(false)
+      end
+
       it 'returns unprocessable entity for a duplicated name' do
         post "/api/v1/accounts/#{account.id}/crm/sources",
              params: { source: { name: source.name } }, headers: admin.create_new_auth_token, as: :json

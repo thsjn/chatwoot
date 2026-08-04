@@ -173,6 +173,22 @@ RSpec.describe 'CRM Pipelines API', type: :request do
         expect(pipeline.reload.name).to eq('Comercial 2026')
         expect(pipeline.position).to eq(9)
       end
+
+      # Turning the "default funnel" switch on used to answer 422 because another pipeline already
+      # held the flag, leaving the administrator to unset the old one first. It is a swap now.
+      it 'moves the default flag away from the pipeline that held it' do
+        previous_default = create(:crm_pipeline, :default, account: account)
+
+        patch "/api/v1/accounts/#{account.id}/crm/pipelines/#{pipeline.id}",
+              params: { pipeline: { is_default: true } },
+              headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['is_default']).to be(true)
+        expect(pipeline.reload.is_default).to be(true)
+        expect(previous_default.reload.is_default).to be(false)
+        expect(Crm::Pipeline.where(account_id: account.id, is_default: true).count).to eq(1)
+      end
     end
   end
 

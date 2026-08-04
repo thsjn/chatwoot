@@ -155,7 +155,7 @@
         "DESCRIPTION_LABEL": "Descrição",
         "DESCRIPTION_PLACEHOLDER": "Para que serve este funil",
         "IS_DEFAULT": "Funil padrão",
-        "IS_DEFAULT_HINT": "É o que o quadro abre por padrão. Só um funil pode ser o padrão.",
+        "IS_DEFAULT_HINT": "É o que o quadro abre por padrão. Só um funil pode ser o padrão, então ligar aqui tira o padrão do funil atual.",
         "INGESTION": "Criação automática a partir de conversas",
         "INGESTION_HINT": "Escolha as caixas de entrada cujas conversas devem virar cards neste funil.",
         "INGESTION_ON_WARNING": "Toda nova conversa nas caixas selecionadas vai criar um card neste funil (um card por contato dentro da janela de deduplicação). Só ligue para caixas cujas conversas realmente são oportunidades.",

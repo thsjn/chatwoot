@@ -55,6 +55,25 @@ export const buildPipelineSettings = (settings = {}) => ({
   inbox_ids: (settings.inbox_ids || []).map(Number),
 });
 
+/**
+ * Mirrors the swap `Crm::Pipeline` performs: marking a funnel as the default takes the flag away
+ * from the one that held it. Only the written pipeline comes back in the response, so without this
+ * the "default" badge would sit on two rows until the screen is fetched again.
+ *
+ * @param {Array} pipelines Stored list.
+ * @param {Object} saved Pipeline the backend just wrote.
+ * @returns {Array} The list with the flag left only on `saved`.
+ */
+const clearOtherDefaults = (pipelines, saved) => {
+  if (!saved.is_default) return pipelines;
+
+  return pipelines.map(pipeline =>
+    pipeline.id === saved.id || !pipeline.is_default
+      ? pipeline
+      : { ...pipeline, is_default: false }
+  );
+};
+
 export const useCrmSettingsStore = defineStore('crmSettings', {
   state: () => ({
     pipelines: [],
@@ -102,7 +121,7 @@ export const useCrmSettingsStore = defineStore('crmSettings', {
       this.uiFlags.isSaving = true;
       try {
         const { data } = await CrmPipelinesAPI.create(payload);
-        this.pipelines = [...this.pipelines, data];
+        this.pipelines = [...clearOtherDefaults(this.pipelines, data), data];
         return data;
       } finally {
         this.uiFlags.isSaving = false;
@@ -113,7 +132,7 @@ export const useCrmSettingsStore = defineStore('crmSettings', {
       this.uiFlags.isSaving = true;
       try {
         const { data } = await CrmPipelinesAPI.update(id, payload);
-        this.pipelines = this.pipelines.map(pipeline =>
+        this.pipelines = clearOtherDefaults(this.pipelines, data).map(pipeline =>
           pipeline.id === data.id ? data : pipeline
         );
         return data;

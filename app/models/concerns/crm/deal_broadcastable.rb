@@ -26,13 +26,45 @@ module Crm::DealBroadcastable
   # the deal through the API anyway. That is exactly why the store MERGES this into the card it
   # already holds instead of replacing it — a card whose drawer is open keeps its conversations.
   def push_event_data
-    attributes.slice(*CARD_EVENT_ATTRIBUTES).symbolize_keys
-              .merge(timestamps_event_data)
-              .merge(value: value, status: status, next_activity_at: next_activity_at&.to_i)
-              .merge(relations_event_data)
+    json_safe(
+      attributes.slice(*CARD_EVENT_ATTRIBUTES).symbolize_keys
+                .merge(timestamps_event_data)
+                .merge(value: value, status: status, next_activity_at: next_activity_at&.to_i)
+                .merge(relations_event_data)
+    )
   end
 
   private
+
+  # This payload travels as an ARGUMENT of `ActionCableBroadcastJob`, and Sidekiq refuses to enqueue
+  # a job whose arguments are not native JSON types (`Sidekiq::JobUtil#verify_json`). Two parts of
+  # the card cannot satisfy that on their own: `position` is a Postgres numeric, which Rails hands
+  # back as a `BigDecimal`, and `custom_attributes`/`utm` are jsonb of free content — whatever the
+  # account writes into a custom field ends up here. So the conversion is done once, recursively,
+  # over the whole payload instead of field by field: a new column or a new nested value cannot
+  # reintroduce the bug.
+  #
+  # It matters more than a serialization detail because the dispatch runs in `after_*_commit`: the
+  # row is already written when the argument is rejected, so the user gets a 500 on an operation
+  # that actually succeeded, the card only appears after a reload, and `lock_version` drifts (the
+  # next edit comes back as a 409).
+  #
+  # Dates and times are rendered exactly as the jbuilder partial renders them (`as_json`, i.e.
+  # "2026-01-15"), because the board store MERGES this payload over the card it already holds: a
+  # field that arrived through the API and the same field arriving through the websocket have to be
+  # the same shape. Hash KEYS are left alone on purpose — the symbol keys of this payload are what
+  # every other `push_event_data` in the app uses, ActiveJob stringifies them on serialize and
+  # restores them on deserialize, and the jsonb columns only ever have string keys.
+  def json_safe(raw)
+    case raw
+    when String, Integer, Float, TrueClass, FalseClass, NilClass then raw
+    when BigDecimal then raw.to_f
+    when Time, Date then raw.as_json
+    when Array then raw.map { |item| json_safe(item) }
+    when Hash then raw.transform_values { |item| json_safe(item) }
+    else raw.to_s
+    end
+  end
 
   # Epoch seconds, matching what the jbuilder partial serves the board, so a card that arrived
   # through the API and one that arrived through the websocket are the same shape.

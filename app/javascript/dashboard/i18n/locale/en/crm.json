@@ -155,7 +155,7 @@
         "DESCRIPTION_LABEL": "Description",
         "DESCRIPTION_PLACEHOLDER": "What this funnel is for",
         "IS_DEFAULT": "Default pipeline",
-        "IS_DEFAULT_HINT": "The one the board opens on. Only one pipeline can be the default.",
+        "IS_DEFAULT_HINT": "The one the board opens on. Only one pipeline can be the default, so turning this on takes it away from the current one.",
         "INGESTION": "Automatic ingestion from conversations",
         "INGESTION_HINT": "Pick the inboxes whose conversations should become cards in this funnel.",
         "INGESTION_ON_WARNING": "Every new conversation in the selected inboxes will create a card in this funnel (one card per contact within the deduplication window). Only turn this on for inboxes whose conversations really are opportunities.",
