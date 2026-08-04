@@ -43,7 +43,11 @@ vi.mock('dashboard/composables/store', () => ({
   }),
 }));
 
-vi.mock('vue-router', () => ({
+// Partial mock on purpose: the screen only needs `useRoute`/`useRouter`, but the
+// import chain reaches modules that call `createRouter`, and a total mock drops
+// every other export — the file then fails to load before a single test runs.
+vi.mock('vue-router', async importOriginal => ({
+  ...(await importOriginal()),
   useRoute: () => ({ params: { accountId: 1 } }),
   useRouter: () => ({ push: vi.fn() }),
 }));

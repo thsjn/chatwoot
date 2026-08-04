@@ -85,6 +85,25 @@ Publish help articles, FAQs, and guides through the built-in Help Center Portal.
 - Downloadable Reports for offline analysis and reporting.
 
 
+## CRM Kanban (este fork)
+
+Este fork adiciona um módulo de **CRM Kanban** ao Chatwoot: um funil de vendas em
+quadro, com cards ligados aos contatos e às conversas da conta, ingestão
+automática de conversas, ingestão externa de leads por token, atividades por
+oportunidade e relatórios de funil. É **opt-in por conta**, pelo toggle
+`crm_kanban` — desligado, a instalação se comporta como um Chatwoot sem ele.
+
+A documentação está em [`docs/crm/`](./docs/crm/):
+
+- [`docs/crm/README.md`](./docs/crm/README.md) — o que o módulo faz, conceitos,
+  como ativar e semear, limitações conhecidas.
+- [`docs/crm/api.md`](./docs/crm/api.md) — referência da API, incluindo o
+  endpoint público de ingestão de leads.
+- [`docs/crm/arquitetura.md`](./docs/crm/arquitetura.md) — tabelas, decisões de
+  projeto e armadilhas, para quem for manter.
+
+O ritual de deploy e rollback do fork está em [`UPGRADE.md`](./UPGRADE.md).
+
 ## Documentation
 
 Detailed documentation is available at [chatwoot.com/help-center](https://www.chatwoot.com/help-center).

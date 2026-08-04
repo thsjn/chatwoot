@@ -140,11 +140,22 @@ jobs:
 
       - name: Specs do CRM
         run: |
+          # Apenas os specs DO MODULO. `spec/listeners` inteiro traria specs do
+          # upstream que falham por razoes alheias (ex: installation_config
+          # duplicado) e derrubariam o CI do CRM sem nada nosso ter quebrado.
           paths=()
           for dir in spec/models/crm spec/policies/crm spec/requests/api/v1/accounts/crm \
-                     spec/services/crm spec/services/crm/reports spec/jobs/crm spec/listeners; do
+                     spec/requests/public/api/v1/accounts/crm \
+                     spec/services/crm spec/services/crm/reports spec/jobs/crm; do
             if compgen -G "$dir/*_spec.rb" > /dev/null; then
               paths+=("$dir")
+            fi
+          done
+          # Os dois specs de listener do modulo, nomeados um a um pelo mesmo motivo.
+          for file in spec/listeners/crm_listener_spec.rb \
+                      spec/listeners/action_cable_listener_crm_spec.rb; do
+            if [ -f "$file" ]; then
+              paths+=("$file")
             fi
           done
           if [ ${#paths[@]} -eq 0 ]; then
