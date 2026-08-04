@@ -6,6 +6,7 @@ import { emitter } from 'shared/helpers/mitt';
 import { useImpersonation } from 'dashboard/composables/useImpersonation';
 import { pendingGroupNavigation } from 'dashboard/helper/pendingGroupNavigation';
 import { useCallsStore } from 'dashboard/stores/calls';
+import { useCrmBoardStore } from 'dashboard/store/crm/board';
 import {
   applyOutboundAnswer,
   armOutboundRecorder,
@@ -83,6 +84,11 @@ class ActionCableConnector extends BaseActionCableConnector {
       'internal_chat.reaction.created': this.onInternalChatReactionCreated,
       'internal_chat.reaction.deleted': this.onInternalChatReactionDeleted,
       'internal_chat.poll.voted': this.onInternalChatPollVoted,
+      'crm_deal.created': this.onCrmDealChanged,
+      'crm_deal.updated': this.onCrmDealChanged,
+      'crm_deal.moved': this.onCrmDealChanged,
+      'crm_deal.archived': this.onCrmDealChanged,
+      'crm_stage.positions_rebalanced': this.onCrmStagePositionsRebalanced,
       'voice_call.incoming': this.onVoiceCallIncoming,
       'voice_call.outbound_connected': this.onVoiceCallOutboundConnected,
       'voice_call.outbound_accepted': this.onVoiceCallOutboundAccepted,
@@ -537,6 +543,19 @@ class ActionCableConnector extends BaseActionCableConnector {
       channelId: data.internal_chat_channel_id,
       poll: data,
     });
+  };
+
+  // The four deal events land on the same handler: the store decides what to do with the card
+  // from the payload (an archived card leaves the board whichever event announced it), and it
+  // drops the echo of a drag this tab is still waiting on.
+  // eslint-disable-next-line class-methods-use-this
+  onCrmDealChanged = data => {
+    useCrmBoardStore().applyRealtimeDeal(data);
+  };
+
+  // eslint-disable-next-line class-methods-use-this
+  onCrmStagePositionsRebalanced = data => {
+    useCrmBoardStore().applyRealtimeStageRebalance(data);
   };
 
   onVoiceCallIncoming = data => {

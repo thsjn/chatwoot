@@ -287,6 +287,35 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
     broadcast(account, [account_token(account)], CONTACT_GROUP_SYNCED, payload)
   end
 
+  def crm_deal_created(event)
+    broadcast_crm_deal(event, CRM_DEAL_CREATED)
+  end
+
+  def crm_deal_updated(event)
+    broadcast_crm_deal(event, CRM_DEAL_UPDATED)
+  end
+
+  def crm_deal_moved(event)
+    broadcast_crm_deal(event, CRM_DEAL_MOVED)
+  end
+
+  def crm_deal_archived(event)
+    broadcast_crm_deal(event, CRM_DEAL_ARCHIVED)
+  end
+
+  # The payload is only the stage: the renumbering rewrote every card of that column, and the
+  # board resyncs it through the API, which reapplies `policy_scope` and the filters currently on
+  # screen. Shipping the new positions here instead would mean publishing the id and rank of cards
+  # a restricted agent is not allowed to see, so the stage id — already public to anyone who can
+  # open the pipeline — is all that travels.
+  def crm_stage_positions_rebalanced(event)
+    stage = event.data[:stage]
+    account = stage.account
+
+    broadcast(account, user_tokens(account, account.agents), CRM_STAGE_POSITIONS_REBALANCED,
+              { stage_id: stage.id, pipeline_id: stage.pipeline_id })
+  end
+
   def conversation_mentioned(event)
     conversation, account = extract_conversation_and_account(event)
     user = event.data[:user]
@@ -309,6 +338,32 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
 
     tokens = user_tokens(account, conversation.inbox.members) + [conversation.contact_inbox.pubsub_token]
     current_user_token.present? ? tokens - [current_user_token] : tokens
+  end
+
+  def broadcast_crm_deal(event, event_name)
+    deal = event.data[:deal]
+    account = deal.account
+
+    broadcast(account, crm_deal_tokens(deal, account), event_name, deal.push_event_data)
+  end
+
+  # The websocket has to hide exactly what `Crm::DealPolicy::Scope` hides: on a pipeline with
+  # `restrito_por_owner`, an agent must not learn through a push about a card the board itself
+  # never lists for them. Administrators always see the whole pipeline, and a card with no owner
+  # stays visible to every agent — it is a lead nobody picked up yet, which is the same exception
+  # the policy makes. Scoping the owner lookup through `account.agents` keeps an owner who is an
+  # administrator from being added twice, and an owner who left the account from being pushed to.
+  def crm_deal_tokens(deal, account)
+    restricted = crm_pipeline_restricted?(deal) && deal.owner_id.present?
+    agents = restricted ? account.agents.where(id: deal.owner_id) : account.agents
+
+    (account.administrators.pluck(:pubsub_token) + agents.pluck(:pubsub_token)).uniq
+  end
+
+  # Same cast as the policy: `settings` is jsonb, so the flag arrives either as a JSON boolean or
+  # as the string the settings form writes.
+  def crm_pipeline_restricted?(deal)
+    ActiveModel::Type::Boolean.new.cast(deal.pipeline.settings['restrito_por_owner'])
   end
 
   def user_tokens(account, agents)

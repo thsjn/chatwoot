@@ -74,6 +74,12 @@ export const useCrmBoardStore = defineStore('crmBoard', {
     moveError: null,
     // { dealId, stageId, targetIndex } kept while the lost reason modal is open.
     pendingLostReasonMove: null,
+    // Ids of the cards this board is dragging right now. A realtime event for one of them is the
+    // echo of our own request and must be dropped: the HTTP response is the authoritative one and
+    // applying the push first would snap the card back under the cursor.
+    pendingMoveDealIds: [],
+    // Stages whose rebalance arrived while a drag was in flight, replayed once it settles.
+    pendingRebalancedStageIds: [],
   }),
 
   getters: {
@@ -235,6 +241,7 @@ export const useCrmBoardStore = defineStore('crmBoard', {
       const position = this.applyOptimisticMove({ deal, stageId, targetIndex });
 
       this.uiFlags.movingDeal = true;
+      this.pendingMoveDealIds.push(deal.id);
       try {
         const { data } = await CrmDealsAPI.move(deal.id, {
           stageId,
@@ -255,7 +262,11 @@ export const useCrmBoardStore = defineStore('crmBoard', {
           targetIndex,
         });
       } finally {
+        this.pendingMoveDealIds = this.pendingMoveDealIds.filter(
+          id => id !== deal.id
+        );
         this.uiFlags.movingDeal = false;
+        await this.flushPendingRebalances();
       }
     },
 
@@ -369,6 +380,89 @@ export const useCrmBoardStore = defineStore('crmBoard', {
 
       this.removeDeal(Number(dealId));
       return normalizeDeal(data);
+    },
+
+    // --- realtime -----------------------------------------------------------------------
+
+    /**
+     * Single entry point for `crm_deal.created|updated|moved|archived`: the four events carry the
+     * same card and what the board has to do with it is decided by the payload, not by the name —
+     * a card that comes back archived leaves the board no matter which event announced it.
+     *
+     * The payload is the CARD, not the drawer (the backend leaves the linked conversations out),
+     * so it is MERGED over the card already in the store instead of replacing it.
+     *
+     * @param {Object} payload Deal as broadcast by `Crm::Deal#push_event_data`.
+     * @returns {Object|null} The card as it ended up on the board, or `null` when ignored.
+     */
+    applyRealtimeDeal(payload) {
+      const incoming = normalizeDeal(payload);
+      const stageId = Number(incoming.stage_id);
+
+      // Another pipeline, or a column this board never loaded: there is nothing to update, and
+      // inserting it would invent a card outside the funnel on screen.
+      if (
+        Number(incoming.pipeline_id) !== this.selectedPipelineId ||
+        !this.stages.some(stage => stage.id === stageId)
+      ) {
+        return null;
+      }
+
+      // Our own drag is still in flight for this card — see `pendingMoveDealIds`.
+      if (this.pendingMoveDealIds.includes(incoming.id)) return null;
+
+      const existing = this.getDeal(incoming.id);
+      // ActionCable gives no ordering guarantee between a push and the response of our own
+      // request, and `lock_version` only ever grows, so an older version is a late duplicate.
+      if (existing && incoming.lock_version < existing.lock_version)
+        return null;
+
+      // Archiving (and restoring) swaps which of the two listings the card belongs to.
+      if (this.showArchived !== !!incoming.archived_at) {
+        if (!existing) return null;
+
+        this.removeDeal(incoming.id);
+        return null;
+      }
+
+      // A filtered board cannot tell whether a card it never listed matches the filters, and
+      // guessing would show a card that contradicts the filter chip on screen. Cards already
+      // rendered keep being updated, which is what matters while someone is watching them.
+      if (!existing && this.hasActiveFilters) return null;
+
+      return this.upsertDeal({ ...existing, ...payload });
+    },
+
+    /**
+     * `Crm::RebalanceStagePositionsJob` renumbered a whole column, so every position this board
+     * holds for it is stale and the next drop would compute a midpoint out of numbers that no
+     * longer exist. The column is refetched instead of being patched from the event: the request
+     * reapplies the visibility policy and the filters currently on screen, which a broadcast
+     * carrying raw positions could not do without leaking cards a restricted agent cannot see.
+     */
+    async applyRealtimeStageRebalance({ stage_id: stageId }) {
+      const id = Number(stageId);
+      if (!this.stages.some(stage => stage.id === id)) return null;
+
+      // Refetching under a drag would drop the optimistic card, so it waits for the move.
+      if (this.pendingMoveDealIds.length) {
+        if (!this.pendingRebalancedStageIds.includes(id)) {
+          this.pendingRebalancedStageIds.push(id);
+        }
+        return null;
+      }
+
+      return this.fetchDeals({ stageId: id, page: 1 });
+    },
+
+    async flushPendingRebalances() {
+      if (this.pendingMoveDealIds.length) return;
+
+      const stageIds = this.pendingRebalancedStageIds;
+      this.pendingRebalancedStageIds = [];
+      await Promise.all(
+        stageIds.map(stageId => this.fetchDeals({ stageId, page: 1 }))
+      );
     },
 
     // --- move internals -----------------------------------------------------------------

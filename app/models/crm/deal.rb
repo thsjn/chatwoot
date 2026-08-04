@@ -30,6 +30,11 @@
 #
 # Indexes
 #
+#  index_crm_deals_active_on_account_pipeline_close_on  (account_id,pipeline_id,expected_close_on) WHERE (archived_at IS NULL)
+#  index_crm_deals_active_on_account_pipeline_closed     (account_id,pipeline_id,closed_at) WHERE (archived_at IS NULL)
+#  index_crm_deals_active_on_account_pipeline_created    (account_id,pipeline_id,created_at) WHERE (archived_at IS NULL)
+#  index_crm_deals_active_on_pipeline_status_stage       (pipeline_id,status,stage_id) WHERE (archived_at IS NULL)
+#  index_crm_deals_active_on_stage_position              (stage_id,position,id) WHERE (archived_at IS NULL)
 #  index_crm_deals_on_account_id                  (account_id)
 #  index_crm_deals_on_account_id_and_archived_at  (account_id,archived_at)
 #  index_crm_deals_on_account_id_and_status       (account_id,status)
@@ -57,20 +62,39 @@
 #  fk_rails_...  (team_id => teams.id) ON DELETE => nullify
 #
 class Crm::Deal < ApplicationRecord
+  include Crm::DealBroadcastable
+
   self.table_name = 'crm_deals'
 
   # `position` is a numeric (not an integer) on purpose: the board uses fractional indexing.
   # Dropping a card between two neighbours writes the average of their positions
   # (e.g. between 1.0 and 2.0 -> 1.5), so reordering touches a single row instead of
   # renumbering the whole column. Dropping at the top/bottom uses `min - POSITION_GAP` /
-  # `max + POSITION_GAP`. When neighbours get too close, the column should be rebalanced
-  # in background with evenly spaced multiples of POSITION_GAP.
+  # `max + POSITION_GAP`. When neighbours get too close, `Crm::MoveDealService` hands the column
+  # to `Crm::RebalanceStagePositionsJob`, which renumbers it as multiples of POSITION_GAP.
   POSITION_GAP = 1000
+
+  # Every drop into the same interval halves the remaining room (1000 -> 500 -> 250 ...), so after
+  # roughly fifty successive drops the neighbours are less than one unit apart and the next midpoint
+  # stops being representable as a distinct value: two cards collide and the column order becomes
+  # arbitrary. One whole unit of slack is the point where the column is renumbered in background.
+  POSITION_REBALANCE_THRESHOLD = 1
+
+  # Smallest distance between two neighbouring cards of a column, which is what tells the move
+  # service the fractional indexing has run out of room. It is a single window pass over
+  # `index_crm_deals_active_on_stage_position`, so it costs one indexed query per move.
+  MIN_POSITION_GAP_SQL = <<~SQL.squish.freeze
+    SELECT MIN(gap) FROM (
+      SELECT position - LAG(position) OVER (ORDER BY position, id) AS gap
+        FROM crm_deals
+       WHERE stage_id = :stage_id AND archived_at IS NULL
+    ) gaps
+  SQL
 
   # The board card shows whether the deal has a next step scheduled, and a listing renders 25
   # cards per column: resolving that per record would be one query per card. This correlated
   # subquery rides along the listing query as an extra column (see the `with_next_activity`
-  # scope) and is covered by `index_crm_activities_on_deal_id`.
+  # scope) and is covered by `index_crm_activities_pending_on_deal_id_and_due_at`.
   # `now() AT TIME ZONE 'UTC'` matches the `timestamp without time zone` columns Rails writes
   # in UTC, so the comparison does not depend on the Postgres session timezone.
   NEXT_ACTIVITY_AT_SQL = <<~SQL.squish.freeze
@@ -171,6 +195,14 @@ class Crm::Deal < ApplicationRecord
     return self[:next_activity_at] if has_attribute?(:next_activity_at)
 
     activities.pending.where(due_at: Time.current..).minimum(:due_at)
+  end
+
+  # True when the column no longer has room to split between two cards, which is the signal to
+  # renumber it. A column with a single card (or none) has no gap to measure and reads as fine.
+  def self.positions_converging?(stage_id)
+    gap = connection.select_value(sanitize_sql_array([MIN_POSITION_GAP_SQL, { stage_id: stage_id }]))
+
+    gap.present? && gap.to_d < POSITION_REBALANCE_THRESHOLD
   end
 
   private

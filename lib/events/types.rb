@@ -76,6 +76,13 @@ module Events::Types
   AGENT_ADDED = 'agent.added'
   AGENT_REMOVED = 'agent.removed'
 
+  # crm events
+  CRM_DEAL_CREATED = 'crm_deal.created'
+  CRM_DEAL_UPDATED = 'crm_deal.updated'
+  CRM_DEAL_MOVED = 'crm_deal.moved'
+  CRM_DEAL_ARCHIVED = 'crm_deal.archived'
+  CRM_STAGE_POSITIONS_REBALANCED = 'crm_stage.positions_rebalanced'
+
   # copilot events
   COPILOT_MESSAGE_CREATED = 'copilot.message.created'
 

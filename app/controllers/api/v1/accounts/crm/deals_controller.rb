@@ -3,6 +3,17 @@ class Api::V1::Accounts::Crm::DealsController < Api::V1::Accounts::BaseControlle
 
   RESULTS_PER_PAGE = 25
 
+  # The card renders the contact and owner avatars through `Avatarable#avatar_url`, which asks
+  # ActiveStorage whether an avatar is attached: without preloading the attachment and its blob
+  # that is two extra queries per card, so a full column costs fifty round trips nobody sees in
+  # the SQL of the listing itself. Same pattern as `ConversationFinder`.
+  INDEX_INCLUDES = [
+    :team, :stage, :source, :lost_reason,
+    { contact: { avatar_attachment: :blob } },
+    { owner: { avatar_attachment: :blob } },
+    { deal_conversations: { conversation: :inbox } }
+  ].freeze
+
   before_action :fetch_deal, only: [:show, :update, :destroy, :move, :unarchive]
   before_action :authorize_deal, except: [:move]
   before_action :set_current_page, only: [:index]
@@ -10,9 +21,7 @@ class Api::V1::Accounts::Crm::DealsController < Api::V1::Accounts::BaseControlle
   def index
     deals = filtered_deals
     @deals_count = deals.count
-    @deals = deals.ordered.with_next_activity
-                  .includes(:contact, :owner, :team, :stage, :source, :lost_reason, deal_conversations: { conversation: :inbox })
-                  .page(@current_page).per(RESULTS_PER_PAGE)
+    @deals = deals.ordered.with_next_activity.includes(*INDEX_INCLUDES).page(@current_page).per(RESULTS_PER_PAGE)
   end
 
   def show; end

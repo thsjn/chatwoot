@@ -32,10 +32,21 @@ class Crm::MoveDealService
       record_transition(from_stage_id, duration_seconds) if stage_changed
     end
 
+    schedule_rebalance
     @deal
   end
 
   private
+
+  # The destination column is checked after the drop landed, because the card that just arrived is
+  # usually the one that closed the gap. The rewrite itself is a background job: it touches every
+  # card of the column and must not sit inside the drag the user is waiting on. Enqueuing is
+  # outside the transaction so a rolled back move never schedules one.
+  def schedule_rebalance
+    return unless Crm::Deal.positions_converging?(@stage.id)
+
+    Crm::RebalanceStagePositionsJob.perform_later(@stage.id)
+  end
 
   # Reordering a card inside its own column is a neutral operation: the lost reason and the WIP
   # limit only guard the transition INTO a stage, so they are skipped when the stage is the same.
