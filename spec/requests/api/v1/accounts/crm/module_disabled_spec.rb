@@ -78,8 +78,13 @@ RSpec.describe 'CRM module toggle', type: :request do
 
       expect(response).to have_http_status(:not_found)
 
+      # The source has to exist before the block: `source` is a lazy `let`, so referencing it inside
+      # would create the record there and the counter would move because of the fixture instead of
+      # because of the request.
+      source_id = source.id
+
       expect do
-        delete "/api/v1/accounts/#{account.id}/crm/sources/#{source.id}", headers: headers, as: :json
+        delete "/api/v1/accounts/#{account.id}/crm/sources/#{source_id}", headers: headers, as: :json
       end.not_to change(Crm::Source, :count)
 
       expect(response).to have_http_status(:not_found)

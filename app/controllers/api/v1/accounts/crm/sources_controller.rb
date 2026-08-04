@@ -29,8 +29,13 @@ class Api::V1::Accounts::Crm::SourcesController < Api::V1::Accounts::Crm::BaseCo
   # The only response in the whole API that carries the token in the clear: the database keeps a
   # SHA-256 digest, so nothing can show it again. Calling this on a source that already had a token
   # invalidates the old one on the spot.
+  #
+  # NOT `@token`: `DeviseTokenAuth::Concerns::SetUserByToken` owns that instance variable (it holds
+  # a `TokenFactory`) and reads `@token.client` in its `after_action :update_auth_header`, which is
+  # registered before `handle_with_exception` and therefore runs outside it — overwriting it with a
+  # String turns a rendered 200 into an unrescued 500.
   def regenerate_token
-    @token = @source.regenerate_token!
+    @plain_token = @source.regenerate_token!
   end
 
   private
