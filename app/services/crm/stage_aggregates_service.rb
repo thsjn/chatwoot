@@ -21,10 +21,13 @@ class Crm::StageAggregatesService
 
   private
 
+  # `SUM` over a bigint returns numeric in Postgres, which Rails maps to BigDecimal and jbuilder
+  # serialises as a STRING ("100000.0"). The board does arithmetic with these totals on every
+  # optimistic move, so they have to reach the client as integers.
   def totals_by_stage_id
     @deals_scope.where(pipeline_id: @pipeline.id).active.where(status: :open)
                 .group(:stage_id)
                 .pluck(:stage_id, Arel.sql('COUNT(*)'), Arel.sql('COALESCE(SUM(crm_deals.value_cents), 0)'))
-                .to_h { |stage_id, count, value_cents| [stage_id, { deals_count: count, deals_value_cents: value_cents }] }
+                .to_h { |stage_id, count, value_cents| [stage_id, { deals_count: count.to_i, deals_value_cents: value_cents.to_i }] }
   end
 end

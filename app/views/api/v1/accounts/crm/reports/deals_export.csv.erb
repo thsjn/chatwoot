@@ -1,0 +1,18 @@
+<% headers = [
+    'title',
+    'value',
+    'currency',
+    'stage',
+    'status',
+    'contact',
+    'owner',
+    'source',
+    'lost_reason',
+    'created_at',
+    'closed_at'
+  ]
+%>
+<%= CSVSafe.generate_line headers -%>
+<% @report_data.each do |row| %>
+<%= CSVSafe.generate_line row -%>
+<% end %>

@@ -199,6 +199,15 @@ Rails.application.routes.draw do
             end
             resources :sources, only: [:index, :show, :create, :update, :destroy]
             resources :lost_reasons, only: [:index, :show, :create, :update, :destroy]
+            resource :reports, only: [], controller: 'reports' do
+              get :funnel
+              get :stage_durations
+              get :sales_cycle
+              get :forecast
+              get :sources
+              get :loss_reasons
+              get :deals_export
+            end
           end
 
           namespace :internal_chat do
