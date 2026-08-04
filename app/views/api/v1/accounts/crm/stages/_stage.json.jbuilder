@@ -16,6 +16,10 @@ json.deals_count aggregates[:deals_count]
 json.deals_value_cents aggregates[:deals_value_cents]
 
 # Same totals restricted to the board filters, so a filtered column can show how many of its
-# cards matched without losing sight of how full it really is.
-json.filtered_deals_count filtered_aggregates[:deals_count]
-json.filtered_deals_value_cents filtered_aggregates[:deals_value_cents]
+# cards matched without losing sight of how full it really is. They are ONLY emitted while the
+# request carries filters: their presence is the contract the board uses to decide whether the
+# header has two numbers to report or one.
+if filtered_aggregates.present?
+  json.filtered_deals_count filtered_aggregates[:deals_count]
+  json.filtered_deals_value_cents filtered_aggregates[:deals_value_cents]
+end

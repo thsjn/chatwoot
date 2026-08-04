@@ -53,6 +53,28 @@ RSpec.describe 'CRM Sources API', type: :request do
 
         expect(response).to have_http_status(:success)
       end
+
+      # A source the account turned off stays on the deals that already carry it, but it must not
+      # show up in the board filter and in the drawer select as if it were still usable.
+      it 'hides the inactive sources by default' do
+        inactive = create(:crm_source, :inactive, account: account)
+
+        get "/api/v1/accounts/#{account.id}/crm/sources",
+            headers: agent.create_new_auth_token, as: :json
+
+        ids = response.parsed_body['payload'].pluck('id')
+        expect(ids).to include(source.id)
+        expect(ids).not_to include(inactive.id)
+      end
+
+      it 'lists the inactive sources when the administration asks for them' do
+        inactive = create(:crm_source, :inactive, account: account)
+
+        get "/api/v1/accounts/#{account.id}/crm/sources",
+            params: { include_inactive: true }, headers: admin.create_new_auth_token, as: :json
+
+        expect(response.parsed_body['payload'].pluck('id')).to include(inactive.id)
+      end
     end
   end
 

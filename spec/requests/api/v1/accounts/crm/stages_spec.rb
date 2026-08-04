@@ -68,13 +68,18 @@ RSpec.describe 'CRM Stages API', type: :request do
           create(:crm_deal, account: account, pipeline: pipeline, stage: stage, title: 'Sitio Sao Jorge', value_cents: 70_000)
         end
 
-        it 'mirrors the stage total when no filter is applied' do
+        # Without filters the "filtered" total would be the stage total under another name, and the
+        # board reads the presence of these fields as "there is a filter on": emitting them would
+        # light up the filter badge on a board nobody filtered. This request already carries a
+        # `pipeline_id` (the index is nested under it), which is the route and not a filter.
+        it 'omits the filtered aggregates when no filter is applied' do
           get "/api/v1/accounts/#{account.id}/crm/pipelines/#{pipeline.id}/stages",
               headers: admin.create_new_auth_token, as: :json
 
           payload = response.parsed_body['payload'].find { |stage_payload| stage_payload['id'] == stage.id }
-          expect(payload).to include('deals_count' => 2, 'deals_value_cents' => 100_000,
-                                     'filtered_deals_count' => 2, 'filtered_deals_value_cents' => 100_000)
+          expect(payload).to include('deals_count' => 2, 'deals_value_cents' => 100_000)
+          expect(payload).not_to have_key('filtered_deals_count')
+          expect(payload).not_to have_key('filtered_deals_value_cents')
         end
 
         it 'restricts the filtered aggregate to the search term while keeping the stage total intact' do

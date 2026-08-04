@@ -51,9 +51,13 @@ if resource.source.present?
   end
 end
 
-# The drawer lists every conversation attached to the deal and highlights the one that
+# The drawer lists the conversations attached to the deal and highlights the one that
 # originated it, so `is_origin` comes from the join row and not from the conversation.
-json.conversations resource.deal_conversations do |deal_conversation|
+# The list is filtered by `accessible_conversation?`: a conversation of an inbox the agent does not
+# belong to must not surface here just because the deal does.
+linked_conversations = resource.deal_conversations.select { |link| accessible_conversation?(link.conversation) }
+
+json.conversations linked_conversations do |deal_conversation|
   conversation = deal_conversation.conversation
 
   json.id conversation.id

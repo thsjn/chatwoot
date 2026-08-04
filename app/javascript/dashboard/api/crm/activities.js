@@ -11,8 +11,10 @@ class CrmActivities extends ApiClient {
     return `${this.url}/${dealId}/activities`;
   }
 
-  getActivities(dealId) {
-    return axios.get(this.activitiesUrl(dealId));
+  // The timeline is paginated (`meta.count` / `meta.current_page`), so the drawer walks it page
+  // by page instead of stopping at the first twenty five activities.
+  getActivities(dealId, params = {}) {
+    return axios.get(this.activitiesUrl(dealId), { params });
   }
 
   showActivity(dealId, activityId) {

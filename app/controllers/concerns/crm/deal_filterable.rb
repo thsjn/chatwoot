@@ -5,6 +5,10 @@
 module Crm::DealFilterable
   extend ActiveSupport::Concern
 
+  # `pipeline_id` is deliberately out of this list: the stages index is nested under a pipeline, so
+  # it is always present and says nothing about the user having narrowed the board down.
+  BOARD_FILTER_PARAMS = %i[stage_id owner_id source_id q expected_close_since expected_close_until].freeze
+
   private
 
   def apply_deal_filters(scope)
@@ -30,5 +34,12 @@ module Crm::DealFilterable
 
   def filtering_by_status?
     Crm::Deal.statuses.key?(params[:status])
+  end
+
+  # Whether the request actually narrows the board down. Without a filter the "filtered" totals are
+  # by construction the stage totals, so publishing them would make the header report the same
+  # number twice.
+  def board_filters_present?
+    filtering_by_status? || BOARD_FILTER_PARAMS.any? { |key| params[key].present? }
   end
 end

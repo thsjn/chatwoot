@@ -14,8 +14,15 @@ class CrmDeals extends ApiClient {
     return axios.post(this.url, { deal: data });
   }
 
-  update(id, data) {
-    return axios.patch(`${this.url}/${id}`, { deal: data });
+  // `lock_version` travels outside the `deal` wrapper (same shape as `move`) and is optional: it
+  // is what turns two agents editing the same card from a silent overwrite into a 409.
+  update(id, data, lockVersion = null) {
+    return axios.patch(`${this.url}/${id}`, {
+      deal: data,
+      ...(lockVersion === null || lockVersion === undefined
+        ? {}
+        : { lock_version: lockVersion }),
+    });
   }
 
   // `destroy` archives the deal, so restoring it is a dedicated endpoint instead of an update:

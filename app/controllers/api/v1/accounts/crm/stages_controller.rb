@@ -46,8 +46,14 @@ class Api::V1::Accounts::Crm::StagesController < Api::V1::Accounts::BaseControll
   # behind a filter must never make a full column look free. `filtered_deals_count` matches the
   # cards the board is actually rendering, so a filtered column does not show a header that
   # contradicts its own content.
+  #
+  # The second query only runs when the request carries board filters: without them the filtered
+  # scope IS the stage scope, so the answer would be the stage total under another name — and the
+  # board reads the presence of these fields as "there is a filter on".
   def set_stage_aggregates
     @stage_aggregates = Crm::StageAggregatesService.new(pipeline: @pipeline, deals_scope: policy_scope(Crm::Deal).open).perform
+    return unless board_filters_present?
+
     @filtered_stage_aggregates = Crm::StageAggregatesService.new(pipeline: @pipeline, deals_scope: filtered_deals_scope).perform
   end
 

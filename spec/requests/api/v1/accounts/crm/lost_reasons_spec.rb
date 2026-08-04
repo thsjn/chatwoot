@@ -47,6 +47,28 @@ RSpec.describe 'CRM Lost Reasons API', type: :request do
 
         expect(response).to have_http_status(:success)
       end
+
+      # An inactive reason is rejected by `Crm::MoveDealService`, so offering it in the picker
+      # only builds a dead end for whoever chooses it.
+      it 'hides the inactive reasons by default' do
+        inactive = create(:crm_lost_reason, :inactive, account: account)
+
+        get "/api/v1/accounts/#{account.id}/crm/lost_reasons",
+            headers: agent.create_new_auth_token, as: :json
+
+        ids = response.parsed_body['payload'].pluck('id')
+        expect(ids).to include(lost_reason.id)
+        expect(ids).not_to include(inactive.id)
+      end
+
+      it 'lists the inactive reasons when the administration asks for them' do
+        inactive = create(:crm_lost_reason, :inactive, account: account)
+
+        get "/api/v1/accounts/#{account.id}/crm/lost_reasons",
+            params: { include_inactive: true }, headers: admin.create_new_auth_token, as: :json
+
+        expect(response.parsed_body['payload'].pluck('id')).to include(inactive.id)
+      end
     end
   end
 

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, toRef, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useEventListener } from '@vueuse/core';
 import { useI18n } from 'vue-i18n';
@@ -9,6 +9,7 @@ import { useAlert } from 'dashboard/composables';
 import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useCrmBoardStore } from 'dashboard/store/crm/board';
 import CrmActivitiesAPI from 'dashboard/api/crm/activities';
+import { useDealActivities } from '../composables/useDealActivities';
 
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
@@ -59,8 +60,16 @@ const teams = useMapGetter('teams/getTeams');
 
 const drawerRef = ref(null);
 
-const activities = ref([]);
-const isFetchingActivities = ref(false);
+const {
+  activities,
+  isFetching: isFetchingActivities,
+  hasMore: hasMoreActivities,
+  fetchActivities: fetchFirstActivitiesPage,
+  loadMore: loadMoreActivities,
+  addActivity,
+  replaceActivity,
+} = useDealActivities(toRef(props, 'dealId'));
+
 const isSavingActivity = ref(false);
 const isArchiving = ref(false);
 const isUnarchiving = ref(false);
@@ -156,24 +165,34 @@ const closeDrawer = () => {
 };
 
 const fetchActivities = async () => {
-  if (!props.dealId) return;
-
-  isFetchingActivities.value = true;
   try {
-    const { data } = await CrmActivitiesAPI.getActivities(props.dealId);
-    activities.value = data.payload;
+    await fetchFirstActivitiesPage();
   } catch (error) {
     useAlert(t('CRM.ACTIVITY.LOAD_ERROR'));
-  } finally {
-    isFetchingActivities.value = false;
   }
 };
 
+const loadMore = async () => {
+  try {
+    await loadMoreActivities();
+  } catch (error) {
+    useAlert(t('CRM.ACTIVITY.LOAD_ERROR'));
+  }
+};
+
+// A 409 means someone else saved this card first: the store already swapped it for the server
+// version, so the drawer only has to say the edit was dropped.
 const saveField = async payload => {
   try {
     await boardStore.updateDeal(deal.value.id, payload);
   } catch (error) {
-    useAlert(t('CRM.DEAL.UPDATE_ERROR'));
+    useAlert(
+      t(
+        error.response?.status === 409
+          ? 'CRM.DEAL.UPDATE_CONFLICT'
+          : 'CRM.DEAL.UPDATE_ERROR'
+      )
+    );
   }
 };
 
@@ -260,7 +279,7 @@ const createActivity = async payload => {
       deal.value.id,
       payload
     );
-    activities.value = [...activities.value, data];
+    addActivity(data);
   } catch (error) {
     useAlert(t('CRM.ACTIVITY.CREATE_ERROR'));
   } finally {
@@ -296,9 +315,7 @@ const completeActivity = async activity => {
       activity.id,
       { completed_at: new Date().toISOString() }
     );
-    activities.value = activities.value.map(item =>
-      item.id === data.id ? data : item
-    );
+    replaceActivity(data);
   } catch (error) {
     useAlert(t('CRM.ACTIVITY.UPDATE_ERROR'));
   }
@@ -676,7 +693,7 @@ onMounted(() => {
             </div>
 
             <div
-              v-if="isFetchingActivities"
+              v-if="isFetchingActivities && !sortedActivities.length"
               class="flex h-24 items-center justify-center"
             >
               <Spinner />
@@ -763,6 +780,16 @@ onMounted(() => {
                 </span>
               </li>
             </ul>
+
+            <Button
+              v-if="hasMoreActivities"
+              variant="link"
+              color="slate"
+              size="sm"
+              :label="$t('CRM.BOARD.LOAD_MORE')"
+              :is-loading="isFetchingActivities"
+              @click="loadMore"
+            />
           </section>
         </div>
       </aside>

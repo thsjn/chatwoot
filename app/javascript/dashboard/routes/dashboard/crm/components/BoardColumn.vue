@@ -40,8 +40,9 @@ const accentClass = computed(() => STAGE_ACCENT_CLASSES[props.stage.color]);
 
 const isArchivedView = computed(() => store.getShowArchived);
 
-// The server only sends the `filtered_*` aggregates while the board has filters applied, so their
-// presence is what tells the header there are two numbers to report instead of one.
+// The server only sends the `filtered_*` aggregates while the request carries board filters, so
+// their presence is what tells the header there are two numbers to report instead of one. On an
+// unfiltered board they are absent and the header shows the stage total once.
 const hasFilteredTotals = computed(
   () => props.stage.filtered_deals_count !== undefined
 );

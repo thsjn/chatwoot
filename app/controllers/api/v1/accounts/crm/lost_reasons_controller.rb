@@ -2,8 +2,13 @@ class Api::V1::Accounts::Crm::LostReasonsController < Api::V1::Accounts::BaseCon
   before_action :fetch_lost_reason, only: [:show, :update, :destroy]
   before_action :authorize_lost_reason
 
+  # A reason the account retired is not an answer the board may offer: `Crm::MoveDealService`
+  # rejects it with `lost_reason_inactive`, so listing it only builds a picker whose options can
+  # fail. The administration screen manages the retired ones through `include_inactive`.
   def index
-    @lost_reasons = lost_reasons.ordered
+    scope = lost_reasons.ordered
+    scope = scope.active unless include_inactive?
+    @lost_reasons = scope
   end
 
   def show; end
@@ -27,6 +32,10 @@ class Api::V1::Accounts::Crm::LostReasonsController < Api::V1::Accounts::BaseCon
 
   def lost_reasons
     Crm::LostReason.where(account_id: Current.account.id)
+  end
+
+  def include_inactive?
+    ActiveModel::Type::Boolean.new.cast(params[:include_inactive])
   end
 
   def fetch_lost_reason

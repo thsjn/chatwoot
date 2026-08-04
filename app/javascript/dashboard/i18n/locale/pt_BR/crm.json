@@ -80,12 +80,14 @@
       "CONVERSATION_ORIGIN": "Origem",
       "NEXT_ACTIVITY_HINT": "Agende uma tarefa para esta oportunidade seguir andando",
       "UPDATE_ERROR": "Não foi possível salvar a oportunidade",
+      "UPDATE_CONFLICT": "Outra pessoa editou esta oportunidade. Suas alterações foram descartadas e o card agora mostra a versão dela.",
       "ARCHIVE_ERROR": "Não foi possível arquivar a oportunidade"
     },
     "MOVE": {
       "CONFLICT": "Este card foi atualizado por outro usuário. Atualize a lista.",
       "WIP_EXCEEDED": "Não é possível mover a oportunidade: limite da coluna excedido",
       "LOST_REASON_REQUIRED": "Motivo da perda é obrigatório",
+      "LOST_REASON_INACTIVE": "Esse motivo de perda não está mais disponível. Escolha outro.",
       "GENERIC_ERROR": "Ocorreu um erro ao mover a oportunidade"
     },
     "LOST_REASON": {

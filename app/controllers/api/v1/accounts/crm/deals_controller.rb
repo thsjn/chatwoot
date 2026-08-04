@@ -18,6 +18,8 @@ class Api::V1::Accounts::Crm::DealsController < Api::V1::Accounts::BaseControlle
   before_action :authorize_deal, except: [:move]
   before_action :set_current_page, only: [:index]
 
+  helper_method :accessible_conversation?
+
   def index
     deals = filtered_deals
     @deals_count = deals.count
@@ -34,8 +36,16 @@ class Api::V1::Accounts::Crm::DealsController < Api::V1::Accounts::BaseControlle
     @deal.save!
   end
 
+  # `lock_version` is optional: the drawer sends the version of the card it rendered, so two agents
+  # editing the same deal collide with a 409 (carrying the current deal, like `move` does) instead
+  # of silently overwriting each other. Callers that do not track a version — the internal ones and
+  # anything scripted against the API — keep the previous last-write-wins behaviour.
   def update
+    @deal.lock_version = params[:lock_version] if params[:lock_version].present?
     @deal.update!(permitted_params)
+  rescue ActiveRecord::StaleObjectError
+    @deal.reload
+    render 'show', status: :conflict
   end
 
   # Deals are never deleted: closing a card keeps the pipeline history intact, so `destroy`
@@ -69,6 +79,25 @@ class Api::V1::Accounts::Crm::DealsController < Api::V1::Accounts::BaseControlle
   end
 
   private
+
+  # A deal links conversations from whichever inbox the lead arrived on, but a conversation is only
+  # visible to an agent who belongs to its inbox or to its team (`ConversationPolicy#show?`).
+  # Publishing the whole link list on the card would leak the existence, `display_id`, status and
+  # inbox of conversations the agent cannot open — the deal being visible says nothing about the
+  # inbox behind it. Administrators keep seeing everything: `assigned_inboxes` already resolves to
+  # every inbox of the account for them.
+  def accessible_conversation?(conversation)
+    accessible_inbox_ids.include?(conversation.inbox_id) ||
+      (conversation.team_id.present? && accessible_team_ids.include?(conversation.team_id))
+  end
+
+  def accessible_inbox_ids
+    @accessible_inbox_ids ||= Current.user.assigned_inboxes.pluck(:id)
+  end
+
+  def accessible_team_ids
+    @accessible_team_ids ||= Current.user.teams.where(account_id: Current.account.id).pluck(:id)
+  end
 
   def deals
     Crm::Deal.where(account_id: Current.account.id)
@@ -109,7 +138,7 @@ class Api::V1::Accounts::Crm::DealsController < Api::V1::Accounts::BaseControlle
   def permitted_params
     params.require(:deal).permit(
       :title, :contact_id, :owner_id, :team_id, :source_id, :source_inbox_id,
-      :value_cents, :currency, :expected_close_on, :position,
+      :value_cents, :currency, :expected_close_on,
       *creation_only_params, custom_attributes: {}, utm: {}
     )
   end
@@ -117,7 +146,10 @@ class Api::V1::Accounts::Crm::DealsController < Api::V1::Accounts::BaseControlle
   # `lost_reason_id` is not updatable here on purpose: it belongs to the transition into a lost
   # stage. Accepting it on `update` would let a client pre-fill the reason on an open deal and
   # then slip past the `lost_reason_required` check on `move`.
+  # `position` is on the same list: it is the rank of the card inside its column, and reordering
+  # is a move — accepting it here would let a client rewrite the board order without going through
+  # `Crm::MoveDealService` (no optimistic lock check, no `crm_deal.moved` semantics).
   def creation_only_params
-    action_name == 'create' ? [:pipeline_id, :stage_id, :lost_reason_id] : []
+    action_name == 'create' ? [:pipeline_id, :stage_id, :lost_reason_id, :position] : []
   end
 end

@@ -213,6 +213,56 @@ RSpec.describe 'CRM Deals API', type: :request do
         expect(response.parsed_body['payload'].pluck('id')).to eq([deal.id])
       end
     end
+
+    # A deal is visible to every agent of the account, but the conversations behind it are not:
+    # they follow the inbox membership rules of `ConversationPolicy`.
+    context 'when the deal links conversations from inboxes the agent cannot access' do
+      let(:member_inbox) { create(:inbox, account: account) }
+      let(:foreign_inbox) { create(:inbox, account: account) }
+      let(:member_conversation) { create(:conversation, account: account, contact: contact, inbox: member_inbox) }
+      let(:foreign_conversation) { create(:conversation, account: account, contact: contact, inbox: foreign_inbox) }
+
+      before do
+        create(:inbox_member, user: agent, inbox: member_inbox)
+        create(:crm_deal_conversation, :origin, deal: deal, conversation: member_conversation)
+        create(:crm_deal_conversation, deal: deal, conversation: foreign_conversation)
+      end
+
+      it 'only lists the conversations of the inboxes the agent belongs to' do
+        get "/api/v1/accounts/#{account.id}/crm/deals",
+            headers: agent.create_new_auth_token, as: :json
+
+        conversations = response.parsed_body['payload'].first['conversations']
+        expect(conversations.pluck('id')).to eq([member_conversation.id])
+      end
+
+      it 'lists a conversation of an inaccessible inbox when it belongs to a team of the agent' do
+        team = create(:team, account: account)
+        create(:team_member, team: team, user: agent)
+        foreign_conversation.update!(team: team)
+
+        get "/api/v1/accounts/#{account.id}/crm/deals",
+            headers: agent.create_new_auth_token, as: :json
+
+        conversations = response.parsed_body['payload'].first['conversations']
+        expect(conversations.pluck('id')).to contain_exactly(member_conversation.id, foreign_conversation.id)
+      end
+
+      it 'lists every linked conversation for an administrator' do
+        get "/api/v1/accounts/#{account.id}/crm/deals",
+            headers: admin.create_new_auth_token, as: :json
+
+        conversations = response.parsed_body['payload'].first['conversations']
+        expect(conversations.pluck('id')).to contain_exactly(member_conversation.id, foreign_conversation.id)
+      end
+
+      it 'hides the inaccessible conversation on the single deal endpoint too' do
+        get "/api/v1/accounts/#{account.id}/crm/deals/#{deal.id}",
+            headers: agent.create_new_auth_token, as: :json
+
+        expect(response.parsed_body['conversations'].pluck('id')).to eq([member_conversation.id])
+      end
+    end
   end
 
   describe 'GET /api/v1/accounts/{account.id}/crm/deals/:id' do
@@ -466,6 +516,17 @@ RSpec.describe 'CRM Deals API', type: :request do
         expect(deal.reload.lost_reason_id).to be_nil
       end
 
+      # Reordering a card is a move: it has to go through `move`, which carries the optimistic
+      # lock and the transition record.
+      it 'ignores position when it is sent' do
+        patch "/api/v1/accounts/#{account.id}/crm/deals/#{deal.id}",
+              params: { deal: { position: 1 } },
+              headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(deal.reload.position).to eq(1000)
+      end
+
       it 'returns not found for a deal of another account' do
         foreign_deal = create(:crm_deal, account: other_account)
 
@@ -473,6 +534,44 @@ RSpec.describe 'CRM Deals API', type: :request do
               params: { deal: { title: 'Novo' } }, headers: admin.create_new_auth_token, as: :json
 
         expect(response).to have_http_status(:not_found)
+      end
+
+      # Two agents with the drawer open on the same card: the second save must not silently
+      # overwrite the first.
+      it 'returns conflict with the current deal when the lock_version is stale' do
+        stale_version = deal.lock_version
+        deal.update!(title: 'Salvo pelo outro agente')
+
+        patch "/api/v1/accounts/#{account.id}/crm/deals/#{deal.id}",
+              params: { deal: { title: 'Minha edicao' }, lock_version: stale_version },
+              headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:conflict)
+        expect(response.parsed_body['title']).to eq('Salvo pelo outro agente')
+        expect(response.parsed_body['lock_version']).to eq(deal.reload.lock_version)
+        expect(deal.title).to eq('Salvo pelo outro agente')
+      end
+
+      it 'applies the update when the lock_version is the current one' do
+        patch "/api/v1/accounts/#{account.id}/crm/deals/#{deal.id}",
+              params: { deal: { title: 'Minha edicao' }, lock_version: deal.lock_version },
+              headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(deal.reload.title).to eq('Minha edicao')
+        expect(response.parsed_body['lock_version']).to eq(deal.lock_version)
+      end
+
+      # The lock is opt-in so the callers that do not track a version keep working.
+      it 'updates without a lock_version even when the deal moved on in the meantime' do
+        deal.update!(title: 'Salvo pelo outro agente')
+
+        patch "/api/v1/accounts/#{account.id}/crm/deals/#{deal.id}",
+              params: { deal: { title: 'Minha edicao' } },
+              headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(deal.reload.title).to eq('Minha edicao')
       end
     end
   end

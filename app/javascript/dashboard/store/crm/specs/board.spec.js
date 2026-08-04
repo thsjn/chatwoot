@@ -1,6 +1,7 @@
 import { setActivePinia, createPinia } from 'pinia';
 import CrmDealsAPI from 'dashboard/api/crm/deals';
 import CrmStagesAPI from 'dashboard/api/crm/stages';
+import CrmLostReasonsAPI from 'dashboard/api/crm/lostReasons';
 import { useCrmBoardStore, calculatePosition, POSITION_GAP } from '../board';
 
 vi.mock('dashboard/api/crm/deals', () => ({
@@ -8,6 +9,7 @@ vi.mock('dashboard/api/crm/deals', () => ({
     get: vi.fn(),
     move: vi.fn(),
     create: vi.fn(),
+    update: vi.fn(),
     delete: vi.fn(),
   },
 }));
@@ -15,7 +17,9 @@ vi.mock('dashboard/api/crm/pipelines', () => ({ default: { get: vi.fn() } }));
 vi.mock('dashboard/api/crm/stages', () => ({
   default: { getStages: vi.fn() },
 }));
-vi.mock('dashboard/api/crm/lostReasons', () => ({ default: { get: vi.fn() } }));
+vi.mock('dashboard/api/crm/lostReasons', () => ({
+  default: { get: vi.fn(() => ({ data: { payload: [] } })) },
+}));
 vi.mock('dashboard/api/crm/sources', () => ({ default: { get: vi.fn() } }));
 
 const deal = (id, stageId, position, lockVersion = 1, status = 'open') => ({
@@ -28,40 +32,36 @@ const deal = (id, stageId, position, lockVersion = 1, status = 'open') => ({
   value_cents: 100,
 });
 
+const STAGE_FIXTURES = [
+  { id: 10, name: 'New', category: 'open', deals_count: 2, value: 200 },
+  { id: 20, name: 'Lost', category: 'lost', deals_count: 0, value: 0 },
+  { id: 30, name: 'Negotiation', category: 'open', deals_count: 0, value: 0 },
+  { id: 40, name: 'Won', category: 'won', deals_count: 0, value: 0 },
+];
+
 // The header totals only count open, non archived deals, so the seeded numbers ignore the
 // card sitting on the lost column — exactly what the backend query returns.
-const seedBoard = store => {
+//
+// `filtered` reproduces the OTHER shape the stages index answers with: the backend only emits
+// `filtered_deals_*` while the request carries board filters, so an unfiltered board has no such
+// fields and a filtered one has them on every stage. Both are seeded because the store branches
+// on their presence.
+const seedBoard = (store, { filtered = false } = {}) => {
   store.selectedPipelineId = 1;
-  store.stages = [
-    {
-      id: 10,
-      name: 'New',
-      category: 'open',
-      deals_count: 2,
-      deals_value_cents: 200,
-    },
-    {
-      id: 20,
-      name: 'Lost',
-      category: 'lost',
-      deals_count: 0,
-      deals_value_cents: 0,
-    },
-    {
-      id: 30,
-      name: 'Negotiation',
-      category: 'open',
-      deals_count: 0,
-      deals_value_cents: 0,
-    },
-    {
-      id: 40,
-      name: 'Won',
-      category: 'won',
-      deals_count: 0,
-      deals_value_cents: 0,
-    },
-  ];
+  store.filters = filtered ? { q: 'fazenda' } : {};
+  store.stages = STAGE_FIXTURES.map(stage => ({
+    id: stage.id,
+    name: stage.name,
+    category: stage.category,
+    deals_count: stage.deals_count,
+    deals_value_cents: stage.value,
+    ...(filtered
+      ? {
+          filtered_deals_count: stage.deals_count,
+          filtered_deals_value_cents: stage.value,
+        }
+      : {}),
+  }));
   store.deals = {
     10: [deal(1, 10, 1000), deal(2, 10, 2000)],
     20: [deal(3, 20, 1000, 1, 'lost')],
@@ -75,6 +75,11 @@ const seedBoard = store => {
 const totals = (boardStore, stageId) => {
   const stage = boardStore.stages.find(item => item.id === stageId);
   return [stage.deals_count, stage.deals_value_cents];
+};
+
+const filteredTotals = (boardStore, stageId) => {
+  const stage = boardStore.stages.find(item => item.id === stageId);
+  return [stage.filtered_deals_count, stage.filtered_deals_value_cents];
 };
 
 describe('calculatePosition', () => {
@@ -365,5 +370,113 @@ describe('crm board store', () => {
     CrmDealsAPI.delete.mockResolvedValue({});
     await store.archiveDeal(9);
     expect(totals(store, 10)).toEqual([2, 200]);
+  });
+
+  it('leaves the filtered totals out of an unfiltered board', () => {
+    expect(store.hasActiveFilters).toBe(false);
+    expect(filteredTotals(store, 10)).toEqual([undefined, undefined]);
+  });
+
+  it('sends the lock_version of the card on edit and writes back the server deal', async () => {
+    CrmDealsAPI.update.mockResolvedValue({
+      data: { ...deal(1, 10, '1000.0', 2), title: 'Fazenda renomeada' },
+    });
+
+    await store.updateDeal(1, { title: 'Fazenda renomeada' });
+
+    expect(CrmDealsAPI.update).toHaveBeenCalledWith(
+      1,
+      { title: 'Fazenda renomeada' },
+      1
+    );
+    expect(store.getDeal(1).title).toBe('Fazenda renomeada');
+    expect(store.getDeal(1).lock_version).toBe(2);
+  });
+
+  it('replaces the card with the server deal and rethrows on an edit conflict', async () => {
+    const conflict = {
+      response: {
+        status: 409,
+        data: { ...deal(1, 10, '1000.0', 9), title: 'Salvo pelo outro agente' },
+      },
+    };
+    CrmDealsAPI.update.mockRejectedValue(conflict);
+
+    await expect(store.updateDeal(1, { title: 'Minha edicao' })).rejects.toBe(
+      conflict
+    );
+
+    expect(store.getDeal(1).title).toBe('Salvo pelo outro agente');
+    expect(store.getDeal(1).lock_version).toBe(9);
+    expect(store.getDealsByStage(10).map(d => d.id)).toEqual([1, 2]);
+    expect(totals(store, 10)).toEqual([2, 200]);
+  });
+
+  it('keeps the pending move and reopens the modal when the reason went inactive', async () => {
+    CrmDealsAPI.move.mockRejectedValueOnce({
+      response: { status: 422, data: { error_code: 'lost_reason_required' } },
+    });
+    await store.moveDeal({ dealId: 1, stageId: 20, targetIndex: 0 });
+
+    CrmDealsAPI.move.mockRejectedValueOnce({
+      response: { status: 422, data: { error_code: 'lost_reason_inactive' } },
+    });
+    const result = await store.confirmLostReason(55);
+
+    expect(result.errorCode).toBe('lost_reason_inactive');
+    // The move is paused, not lost: the modal is driven by this and has to stay open.
+    expect(store.pendingLostReasonMove).toEqual({
+      dealId: 1,
+      stageId: 20,
+      targetIndex: 0,
+    });
+    expect(store.moveError.messageKey).toBe('CRM.MOVE.LOST_REASON_INACTIVE');
+    // The retired reason has to leave the picker, otherwise the user can only pick it again.
+    expect(CrmLostReasonsAPI.get).toHaveBeenCalled();
+    expect(store.getDealsByStage(10).map(d => d.id)).toEqual([1, 2]);
+  });
+
+  it('releases the pending move only once it lands', async () => {
+    CrmDealsAPI.move.mockRejectedValueOnce({
+      response: { status: 422, data: { error_code: 'lost_reason_required' } },
+    });
+    await store.moveDeal({ dealId: 1, stageId: 20, targetIndex: 0 });
+
+    CrmDealsAPI.move.mockResolvedValueOnce({
+      data: { ...deal(1, 20, '0.0', 2), status: 'lost' },
+    });
+    await store.confirmLostReason(55);
+
+    expect(store.pendingLostReasonMove).toBeNull();
+  });
+});
+
+describe('crm board store with filters applied', () => {
+  let store;
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    store = useCrmBoardStore();
+    seedBoard(store, { filtered: true });
+  });
+
+  it('moves the filtered totals along with the card and restores them on failure', async () => {
+    expect(store.hasActiveFilters).toBe(true);
+    expect(filteredTotals(store, 10)).toEqual([2, 200]);
+
+    CrmDealsAPI.move.mockResolvedValueOnce({ data: deal(1, 30, '0.0', 2) });
+    await store.moveDeal({ dealId: 1, stageId: 30, targetIndex: 0 });
+
+    expect(filteredTotals(store, 10)).toEqual([1, 100]);
+    expect(filteredTotals(store, 30)).toEqual([1, 100]);
+
+    CrmDealsAPI.move.mockRejectedValueOnce({
+      response: { status: 422, data: { error_code: 'wip_limit_exceeded' } },
+    });
+    await store.moveDeal({ dealId: 2, stageId: 30, targetIndex: 0 });
+
+    expect(filteredTotals(store, 10)).toEqual([1, 100]);
+    expect(filteredTotals(store, 30)).toEqual([1, 100]);
   });
 });

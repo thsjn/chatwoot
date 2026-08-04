@@ -13,8 +13,16 @@ export const MOVE_ERRORS = {
   conflict: 'CRM.MOVE.CONFLICT',
   wip_limit_exceeded: 'CRM.MOVE.WIP_EXCEEDED',
   lost_reason_required: 'CRM.MOVE.LOST_REASON_REQUIRED',
+  lost_reason_inactive: 'CRM.MOVE.LOST_REASON_INACTIVE',
   generic: 'CRM.MOVE.GENERIC_ERROR',
 };
+
+// Both codes mean the same thing to the board: the move is paused waiting for a reason the
+// backend accepts. They only differ in what the modal has to tell the user.
+export const LOST_REASON_ERRORS = [
+  'lost_reason_required',
+  'lost_reason_inactive',
+];
 
 // `position` is a Postgres numeric, and Rails serializes BigDecimal as a JSON string, so it
 // arrives as "1000.0". Everything downstream does arithmetic on it, so it is cast on ingest.
@@ -270,14 +278,25 @@ export const useCrmBoardStore = defineStore('crmBoard', {
       }
     },
 
-    // Replays the move the board had to abort because the destination stage requires a reason.
+    /**
+     * Replays the move the board had to abort because the destination stage requires a reason.
+     * The pending move is only released once it actually landed: a reason the account retired in
+     * the meantime comes back as `lost_reason_inactive`, and dropping the pending move here would
+     * throw away the destination the user picked and close the modal on a card that never moved.
+     * The reason list is refetched on that failure so the retired option leaves the picker.
+     */
     async confirmLostReason(lostReasonId) {
       const pendingMove = this.pendingLostReasonMove;
       if (!pendingMove) return { success: false, errorCode: 'no_pending_move' };
 
-      this.pendingLostReasonMove = null;
       this.moveError = null;
-      return this.moveDeal({ ...pendingMove, lostReasonId });
+      const result = await this.moveDeal({ ...pendingMove, lostReasonId });
+
+      if (result.success) this.pendingLostReasonMove = null;
+      if (result.errorCode === 'lost_reason_inactive')
+        await this.fetchLostReasons();
+
+      return result;
     },
 
     cancelLostReasonMove() {
@@ -359,9 +378,26 @@ export const useCrmBoardStore = defineStore('crmBoard', {
       return this.upsertDeal(data);
     },
 
+    /**
+     * Edits from the drawer carry the `lock_version` of the card on screen, so a deal someone
+     * else saved first answers 409 with the current record instead of being overwritten. The
+     * store swaps the stale card for that record — the drawer is bound to it, so the user sees
+     * the other agent's version — and rethrows so the caller can say what happened.
+     */
     async updateDeal(dealId, payload) {
-      const { data } = await CrmDealsAPI.update(dealId, payload);
-      return this.upsertDeal(data);
+      const current = this.getDeal(dealId);
+      try {
+        const { data } = await CrmDealsAPI.update(
+          dealId,
+          payload,
+          current?.lock_version
+        );
+        return this.upsertDeal(data);
+      } catch (error) {
+        if (error.response?.status === 409)
+          this.upsertDeal(error.response.data);
+        throw error;
+      }
     },
 
     // `destroy` archives the deal on the backend, so the card just leaves the board.
@@ -558,11 +594,13 @@ export const useCrmBoardStore = defineStore('crmBoard', {
         return { success: false, errorCode: 'conflict' };
       }
 
-      if (errorCode === 'lost_reason_required') {
+      // The move is not lost, it is paused: keeping it pending is what lets the modal ask again
+      // (with another reason) instead of leaving the card stranded on its original column.
+      if (LOST_REASON_ERRORS.includes(errorCode)) {
         this.pendingLostReasonMove = { dealId, stageId, targetIndex };
         this.moveError = {
           code: errorCode,
-          messageKey: MOVE_ERRORS.lost_reason_required,
+          messageKey: MOVE_ERRORS[errorCode],
           dealId,
           stageId,
         };

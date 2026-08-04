@@ -80,12 +80,14 @@
       "CONVERSATION_ORIGIN": "Origin",
       "NEXT_ACTIVITY_HINT": "Schedule a task so this deal keeps moving",
       "UPDATE_ERROR": "Could not save the deal",
+      "UPDATE_CONFLICT": "Another user edited this deal. Your changes were discarded and the card now shows their version.",
       "ARCHIVE_ERROR": "Could not archive the deal"
     },
     "MOVE": {
       "CONFLICT": "This card has been updated by another user. Please refresh the list.",
       "WIP_EXCEEDED": "Cannot move deal: column limit exceeded",
       "LOST_REASON_REQUIRED": "Lost reason is required",
+      "LOST_REASON_INACTIVE": "That lost reason is no longer available. Pick another one.",
       "GENERIC_ERROR": "An error occurred while moving the deal"
     },
     "LOST_REASON": {

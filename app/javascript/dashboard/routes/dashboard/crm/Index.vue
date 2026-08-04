@@ -13,7 +13,10 @@ import {
 } from 'date-fns';
 
 import { useStore, useMapGetter } from 'dashboard/composables/store';
-import { useCrmBoardStore } from 'dashboard/store/crm/board';
+import {
+  useCrmBoardStore,
+  LOST_REASON_ERRORS,
+} from 'dashboard/store/crm/board';
 
 import Icon from 'dashboard/components-next/icon/Icon.vue';
 import Input from 'dashboard/components-next/input/Input.vue';
@@ -114,7 +117,7 @@ const statusOptions = computed(() => [
 // The lost reason flow owns its own dialog, so the banner would only duplicate it.
 const bannerMessageKey = computed(() => {
   const moveError = store.getMoveError;
-  if (!moveError || moveError.code === 'lost_reason_required') return null;
+  if (!moveError || LOST_REASON_ERRORS.includes(moveError.code)) return null;
 
   return moveError.messageKey;
 });
