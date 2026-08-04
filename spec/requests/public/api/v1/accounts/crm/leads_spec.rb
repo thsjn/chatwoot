@@ -272,9 +272,21 @@ RSpec.describe 'CRM external lead ingestion API', type: :request do
 
   # The IP safelist of Rack::Attack covers 127.0.0.1, which is where request specs come from, so the
   # throttle only engages for a request that looks like it came from outside.
+  #
+  # Rack::Attack itself is switched off outside production (see config/initializers/rack_attack.rb),
+  # so exercising the throttle for real means flipping it on for the duration of these examples and
+  # restoring whatever was there before, whether the example passes or raises.
   describe 'rate limiting' do
     let(:throttle) { Rack::Attack.throttles['/public/api/v1/accounts/:account_id/crm/leads'] }
     let(:remote_headers) { headers.merge('REMOTE_ADDR' => '203.0.113.10') }
+
+    around do |example|
+      original_enabled = Rack::Attack.enabled
+      Rack::Attack.enabled = true
+      example.run
+    ensure
+      Rack::Attack.enabled = original_enabled
+    end
 
     before { allow(throttle).to receive(:limit).and_return(1) }
 
