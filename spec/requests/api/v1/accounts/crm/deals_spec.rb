@@ -272,6 +272,13 @@ RSpec.describe 'CRM Deals API', type: :request do
   end
 
   describe 'POST /api/v1/accounts/{account.id}/crm/deals' do
+    # Deals reuse the account's `custom_attribute_definitions`, scoped to `deal_attribute`: a key
+    # without a definition is not a custom field, it is a typo.
+    before do
+      create(:custom_attribute_definition, account: account, attribute_model: :deal_attribute,
+                                           attribute_key: 'hectares', attribute_display_type: :number)
+    end
+
     let(:valid_params) do
       {
         deal: {
@@ -328,6 +335,64 @@ RSpec.describe 'CRM Deals API', type: :request do
         end.to change(Crm::Deal, :count).by(1)
 
         expect(response).to have_http_status(:success)
+      end
+
+      # The entry into the pipeline is the first step of the funnel, so it is audited like any
+      # other move: without it the report has to guess where the card came in.
+      it 'records the entry into the funnel and credits it to the user' do
+        expect do
+          post "/api/v1/accounts/#{account.id}/crm/deals",
+               params: valid_params, headers: admin.create_new_auth_token, as: :json
+        end.to change(Crm::StageTransition, :count).by(1)
+
+        transition = Crm::Deal.find(response.parsed_body['id']).stage_transitions.sole
+        expect(transition).to have_attributes(from_stage_id: nil, to_stage_id: stage.id, duration_seconds: nil, automated: false)
+        expect(transition.user_id).to eq(admin.id)
+      end
+
+      it 'rejects a custom attribute the account never defined' do
+        expect do
+          post "/api/v1/accounts/#{account.id}/crm/deals",
+               params: { deal: { title: 'Campo inventado', contact_id: contact.id, pipeline_id: pipeline.id, stage_id: stage.id,
+                                 custom_attributes: { inexistente: 'x' } } },
+               headers: admin.create_new_auth_token, as: :json
+        end.not_to change(Crm::Deal, :count)
+
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
+
+      it 'rejects a definition that belongs to another model' do
+        create(:custom_attribute_definition, account: account, attribute_model: :contact_attribute, attribute_key: 'cpf')
+
+        post "/api/v1/accounts/#{account.id}/crm/deals",
+             params: { deal: { title: 'Campo de contato', contact_id: contact.id, pipeline_id: pipeline.id, stage_id: stage.id,
+                               custom_attributes: { cpf: '123' } } },
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
+
+      it 'rejects a value outside the options of a list attribute' do
+        create(:custom_attribute_definition, account: account, attribute_model: :deal_attribute, attribute_key: 'regiao',
+                                             attribute_display_type: :list, attribute_values: %w[norte sul])
+
+        post "/api/v1/accounts/#{account.id}/crm/deals",
+             params: { deal: { title: 'Regiao invalida', contact_id: contact.id, pipeline_id: pipeline.id, stage_id: stage.id,
+                               custom_attributes: { regiao: 'leste' } } },
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
+
+      it 'rejects a lost reason the account deactivated' do
+        inactive_reason = create(:crm_lost_reason, :inactive, account: account)
+
+        post "/api/v1/accounts/#{account.id}/crm/deals",
+             params: { deal: { title: 'Motivo desativado', contact_id: contact.id, pipeline_id: pipeline.id, stage_id: stage.id,
+                               lost_reason_id: inactive_reason.id } },
+             headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
       end
 
       it 'rejects a contact from another account' do
@@ -453,6 +518,79 @@ RSpec.describe 'CRM Deals API', type: :request do
 
         expect(response.parsed_body['payload'].pluck('id')).not_to include(deal.id)
         expect(response.parsed_body['meta']['count']).to eq(0)
+      end
+
+      it 'lists the archived deals when the index asks for them' do
+        delete "/api/v1/accounts/#{account.id}/crm/deals/#{deal.id}",
+               headers: admin.create_new_auth_token, as: :json
+
+        get "/api/v1/accounts/#{account.id}/crm/deals",
+            params: { archived: 'true' }, headers: admin.create_new_auth_token, as: :json
+
+        expect(response.parsed_body['payload'].pluck('id')).to eq([deal.id])
+      end
+
+      it 'still applies the board filters to the archived listing' do
+        deal.archive!
+        create(:crm_deal, :archived, account: account, pipeline: pipeline, stage: stage, contact: contact, title: 'Outra fazenda')
+
+        get "/api/v1/accounts/#{account.id}/crm/deals",
+            params: { archived: 'true', q: 'Boa Vista' }, headers: admin.create_new_auth_token, as: :json
+
+        expect(response.parsed_body['payload'].pluck('id')).to eq([deal.id])
+      end
+    end
+  end
+
+  describe 'PATCH /api/v1/accounts/{account.id}/crm/deals/:id/unarchive' do
+    let(:unarchive_url) { "/api/v1/accounts/#{account.id}/crm/deals/#{deal.id}/unarchive" }
+
+    before { deal.archive! }
+
+    context 'when unauthenticated' do
+      it 'returns unauthorized' do
+        patch unarchive_url, as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+        expect(deal.reload.archived_at).to be_present
+      end
+    end
+
+    context 'when the user is an agent' do
+      it 'is not allowed to restore deals' do
+        patch unarchive_url, headers: agent.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+        expect(deal.reload.archived_at).to be_present
+      end
+    end
+
+    context 'when the user is an administrator' do
+      it 'restores the deal and returns it' do
+        patch unarchive_url, headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['id']).to eq(deal.id)
+        expect(response.parsed_body['archived_at']).to be_nil
+        expect(deal.reload.archived_at).to be_nil
+      end
+
+      it 'puts the card back on the board' do
+        patch unarchive_url, headers: admin.create_new_auth_token, as: :json
+
+        get "/api/v1/accounts/#{account.id}/crm/deals",
+            headers: admin.create_new_auth_token, as: :json
+
+        expect(response.parsed_body['payload'].pluck('id')).to eq([deal.id])
+      end
+
+      it 'returns not found for a deal of another account' do
+        foreign_deal = create(:crm_deal, :archived, account: other_account)
+
+        patch "/api/v1/accounts/#{account.id}/crm/deals/#{foreign_deal.id}/unarchive",
+              headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:not_found)
       end
     end
   end

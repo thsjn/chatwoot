@@ -19,6 +19,11 @@ class Crm::DealPolicy < ApplicationPolicy
     administrator?
   end
 
+  # Restoring a card is the mirror of archiving it (`destroy`), so it takes the same permission.
+  def unarchive?
+    administrator?
+  end
+
   # Same rule as `agent_can_access_deal?`, applied in SQL so listings can't leak deals the
   # controller forgot to filter.
   class Scope < Scope

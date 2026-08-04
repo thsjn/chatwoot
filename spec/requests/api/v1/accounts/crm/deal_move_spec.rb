@@ -65,7 +65,9 @@ RSpec.describe 'CRM Deal move API', type: :request do
                         headers: admin.create_new_auth_token, as: :json
       end.to change(Crm::StageTransition, :count).by(1)
 
-      transition = Crm::StageTransition.find_by(deal_id: deal.id)
+      # Creating the deal already wrote a transition into `origin_stage`, so the move is the
+      # latest entry of the trail and not the only one.
+      transition = Crm::StageTransition.where(deal_id: deal.id).chronological.last
       expect(transition.from_stage_id).to eq(origin_stage.id)
       expect(transition.to_stage_id).to eq(destination_stage.id)
       expect(transition.user_id).to eq(admin.id)
@@ -128,7 +130,7 @@ RSpec.describe 'CRM Deal move API', type: :request do
       expect(response).to have_http_status(:unprocessable_entity)
       expect(response.parsed_body['error_code']).to eq('lost_reason_required')
       expect(deal.reload.stage_id).to eq(origin_stage.id)
-      expect(Crm::StageTransition.where(deal_id: deal.id)).to be_empty
+      expect(Crm::StageTransition.where(deal_id: deal.id).where.not(from_stage_id: nil)).to be_empty
     end
 
     it 'moves the deal when the lost reason is given' do
@@ -140,6 +142,31 @@ RSpec.describe 'CRM Deal move API', type: :request do
       expect(deal.status).to eq('lost')
       expect(deal.lost_reason_id).to eq(lost_reason.id)
       expect(deal.closed_at).to be_present
+    end
+  end
+
+  describe 'contract case 3b: a lost stage with a deactivated lost reason' do
+    let(:inactive_reason) { create(:crm_lost_reason, :inactive, account: account) }
+
+    it 'returns unprocessable entity with the lost_reason_inactive error code' do
+      patch move_url, params: { stage_id: lost_stage.id, lost_reason_id: inactive_reason.id, lock_version: deal.lock_version },
+                      headers: admin.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.parsed_body['error_code']).to eq('lost_reason_inactive')
+      expect(deal.reload.stage_id).to eq(origin_stage.id)
+      expect(deal.lost_reason_id).to be_nil
+    end
+
+    it 'returns lost_reason_invalid for a reason of another account' do
+      foreign_reason = create(:crm_lost_reason, account: other_account)
+
+      patch move_url, params: { stage_id: lost_stage.id, lost_reason_id: foreign_reason.id, lock_version: deal.lock_version },
+                      headers: admin.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.parsed_body['error_code']).to eq('lost_reason_invalid')
+      expect(deal.reload.stage_id).to eq(origin_stage.id)
     end
   end
 
@@ -155,7 +182,7 @@ RSpec.describe 'CRM Deal move API', type: :request do
       expect(response).to have_http_status(:unprocessable_entity)
       expect(response.parsed_body['error_code']).to eq('wip_limit_exceeded')
       expect(deal.reload.stage_id).to eq(origin_stage.id)
-      expect(Crm::StageTransition.where(deal_id: deal.id)).to be_empty
+      expect(Crm::StageTransition.where(deal_id: deal.id).where.not(from_stage_id: nil)).to be_empty
     end
 
     it 'allows the move while the limit is not reached' do
@@ -207,7 +234,7 @@ RSpec.describe 'CRM Deal move API', type: :request do
       expect(response).to have_http_status(:unprocessable_entity)
       expect(response.parsed_body['error_code']).to eq('lock_version_required')
       expect(deal.reload.stage_id).to eq(origin_stage.id)
-      expect(Crm::StageTransition.where(deal_id: deal.id)).to be_empty
+      expect(Crm::StageTransition.where(deal_id: deal.id).where.not(from_stage_id: nil)).to be_empty
     end
 
     it 'is also required to reorder inside the same stage' do

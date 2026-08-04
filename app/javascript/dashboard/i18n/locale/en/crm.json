@@ -7,11 +7,22 @@
       "ADD_DEAL": "Add deal",
       "SEARCH_PLACEHOLDER": "Search deals by title",
       "LOAD_MORE": "Load more",
-      "DISMISS": "Dismiss"
+      "DISMISS": "Dismiss",
+      "SHOW_ARCHIVED": "Archived",
+      "BACK_TO_BOARD": "Back to board",
+      "ARCHIVED_HINT": "Showing archived deals. Open a card to restore it."
     },
     "FILTERS": {
       "ALL_SOURCES": "All sources",
       "ALL_STATUSES": "All statuses",
+      "ALL_OWNERS": "All owners",
+      "ALL_CLOSE_PERIODS": "Any close date",
+      "CLOSE_PERIOD": {
+        "OVERDUE": "Overdue",
+        "THIS_WEEK": "Closing this week",
+        "THIS_MONTH": "Closing this month",
+        "NEXT_30_DAYS": "Closing in 30 days"
+      },
       "STATUS": {
         "OPEN": "Open",
         "WON": "Won",
@@ -26,7 +37,10 @@
     "STAGE": {
       "WIP_FULL": "Column limit reached",
       "WIP_COUNT": "{count} of {limit}",
-      "EMPTY": "No deals in this stage"
+      "EMPTY": "No deals in this stage",
+      "FILTERED_COUNT": "Filtered: {count}",
+      "FILTERED_OF_TOTAL": "{filtered} of {total}",
+      "TOTAL_HINT": "Total in this stage"
     },
     "DEAL": {
       "VALUE": "Deal Value",
@@ -47,6 +61,11 @@
       "ARCHIVE_CONFIRM": "Confirm archive",
       "ARCHIVE_HINT": "The card leaves the board",
       "ARCHIVE_SUCCESS": "Deal archived",
+      "ARCHIVED_BADGE": "Archived",
+      "UNARCHIVE": "Restore",
+      "UNARCHIVE_SUCCESS": "Deal restored to the board",
+      "UNARCHIVE_ERROR": "Could not restore the deal",
+      "CUSTOM_ATTRIBUTES": "Custom attributes",
       "STATUS_OPEN": "Open",
       "STATUS_WON": "Won",
       "STATUS_LOST": "Lost",

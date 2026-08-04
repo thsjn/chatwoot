@@ -18,6 +18,12 @@ class CrmDeals extends ApiClient {
     return axios.patch(`${this.url}/${id}`, { deal: data });
   }
 
+  // `destroy` archives the deal, so restoring it is a dedicated endpoint instead of an update:
+  // `archived_at` is not part of the permitted deal params.
+  unarchive(id) {
+    return axios.patch(`${this.url}/${id}/unarchive`);
+  }
+
   // `move` reads its params from the request root (not wrapped in `deal`) and `lock_version` is
   // mandatory: it is what makes a concurrent drag fail with 409 instead of overwriting the
   // other agent's move.

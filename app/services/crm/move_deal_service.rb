@@ -43,8 +43,21 @@ class Crm::MoveDealService
     raise MoveError, 'lock_version_required' if @lock_version.blank?
     return if @deal.stage_id == @stage.id
 
-    raise MoveError, 'lost_reason_required' if @stage.category_lost? && resolved_lost_reason_id.blank?
+    validate_lost_reason! if @stage.category_lost?
     raise MoveError, 'wip_limit_exceeded' if @stage.wip_exceeded?
+  end
+
+  # A reason the account turned off is no longer a valid answer for "why did we lose this": it is
+  # gone from the picker, so accepting it would keep polluting the loss report with a retired
+  # option. The lookup is scoped to the deal's account so an id from another account reads as a
+  # missing reason, not as an inactive one.
+  def validate_lost_reason!
+    reason_id = resolved_lost_reason_id
+    raise MoveError, 'lost_reason_required' if reason_id.blank?
+
+    reason = Crm::LostReason.find_by(id: reason_id, account_id: @deal.account_id)
+    raise MoveError, 'lost_reason_invalid' if reason.blank?
+    raise MoveError, 'lost_reason_inactive' unless reason.active?
   end
 
   # Assigning `lock_version` from the request makes the UPDATE match on the version the client
@@ -76,10 +89,12 @@ class Crm::MoveDealService
   # The board sends the fractional position computed from the drop neighbours. Without it the
   # card goes to the bottom of the destination column. Only active deals count: an archived card
   # is not on the board, so its position must not push new cards further down.
+  # The account filter is redundant today (a stage id is unique across the whole table) but keeps
+  # the query from being a cross tenant scan by construction.
   def resolved_position
     return @position if @position.present?
 
-    (Crm::Deal.where(stage_id: @stage.id).active.maximum(:position) || 0) + Crm::Deal::POSITION_GAP
+    (Crm::Deal.where(account_id: @deal.account_id, stage_id: @stage.id).active.maximum(:position) || 0) + Crm::Deal::POSITION_GAP
   end
 
   def duration_in_current_stage

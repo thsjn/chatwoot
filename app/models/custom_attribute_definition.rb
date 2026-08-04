@@ -26,7 +26,9 @@ class CustomAttributeDefinition < ApplicationRecord
     :conversation => %w[status priority assignee_id inbox_id team_id display_id campaign_id labels browser_language country_code referer created_at
                         last_activity_at],
     :contact => %w[name email phone_number identifier country_code city company_name created_at last_activity_at referer blocked],
-    :company => %w[name domain description contacts_count created_at updated_at last_activity_at]
+    :company => %w[name domain description contacts_count created_at updated_at last_activity_at],
+    :deal => %w[title value_cents currency status pipeline_id stage_id contact_id owner_id team_id source_id source_inbox_id
+                lost_reason_id expected_close_on closed_at position stage_entered_at last_activity_at created_at updated_at]
   }.freeze
 
   scope :with_attribute_model, ->(attribute_model) { attribute_model.presence && where(attribute_model: attribute_model) }
@@ -42,12 +44,16 @@ class CustomAttributeDefinition < ApplicationRecord
   validates :attribute_model, presence: true
   validate :attribute_must_not_conflict, on: :create
 
-  enum attribute_model: { conversation_attribute: 0, contact_attribute: 1, company_attribute: 2 }
+  # `deal_attribute` powers the custom fields of the CRM board: deals reuse this registry instead
+  # of carrying a parallel definition table of their own.
+  enum attribute_model: { conversation_attribute: 0, contact_attribute: 1, company_attribute: 2, deal_attribute: 3 }
   enum attribute_display_type: { text: 0, number: 1, currency: 2, percent: 3, link: 4, date: 5, list: 6, checkbox: 7 }
 
   belongs_to :account
-  after_update :update_widget_pre_chat_custom_fields, unless: :company_attribute?
-  after_destroy :sync_widget_pre_chat_custom_fields, unless: :company_attribute?
+  # Only the models the pre-chat form of the widget can collect are synced back to it: a company
+  # or a CRM deal attribute has nothing to do with the widget.
+  after_update :update_widget_pre_chat_custom_fields, if: :widget_pre_chat_syncable?
+  after_destroy :sync_widget_pre_chat_custom_fields, if: :widget_pre_chat_syncable?
   after_update_commit :invalidate_filtered_unread_count_filters_update, if: :conversation_attribute_before_or_after?
   after_destroy_commit :invalidate_filtered_unread_count_filters_destroy, if: :conversation_attribute?
 
@@ -56,6 +62,10 @@ class CustomAttributeDefinition < ApplicationRecord
   def normalize_attribute_fields
     self.attribute_key = attribute_key.strip if attribute_key.present?
     self.attribute_display_name = attribute_display_name.strip if attribute_display_name.present?
+  end
+
+  def widget_pre_chat_syncable?
+    conversation_attribute? || contact_attribute?
   end
 
   def sync_widget_pre_chat_custom_fields

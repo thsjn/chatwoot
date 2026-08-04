@@ -2,7 +2,17 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useDebounceFn } from '@vueuse/core';
+import {
+  addDays,
+  endOfMonth,
+  endOfWeek,
+  format,
+  startOfMonth,
+  startOfWeek,
+  subDays,
+} from 'date-fns';
 
+import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useCrmBoardStore } from 'dashboard/store/crm/board';
 
 import Icon from 'dashboard/components-next/icon/Icon.vue';
@@ -11,18 +21,52 @@ import Select from 'dashboard/components-next/select/Select.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
 import BoardColumn from './components/BoardColumn.vue';
+import DealDrawer from './components/DealDrawer.vue';
 import LostReasonModal from './components/LostReasonModal.vue';
 
 const SEARCH_DEBOUNCE_MS = 400;
 
+const ISO_DATE = 'yyyy-MM-dd';
+const toISODate = date => format(date, ISO_DATE);
+
+/**
+ * Presets keep the filter bar to a single control instead of a pair of date pickers. Each one
+ * resolves to the `expected_close_since`/`expected_close_until` window the deals index filters
+ * `expected_close_on` by; an open end simply omits its side of the range.
+ */
+const CLOSE_PERIODS = {
+  overdue: () => ({
+    expected_close_until: toISODate(subDays(new Date(), 1)),
+  }),
+  this_week: () => ({
+    expected_close_since: toISODate(startOfWeek(new Date())),
+    expected_close_until: toISODate(endOfWeek(new Date())),
+  }),
+  this_month: () => ({
+    expected_close_since: toISODate(startOfMonth(new Date())),
+    expected_close_until: toISODate(endOfMonth(new Date())),
+  }),
+  next_30_days: () => ({
+    expected_close_since: toISODate(new Date()),
+    expected_close_until: toISODate(addDays(new Date(), 30)),
+  }),
+};
+
 const { t } = useI18n();
 const store = useCrmBoardStore();
+const rootStore = useStore();
+
+const agents = useMapGetter('agents/getAgents');
 
 const searchQuery = ref('');
 const sourceId = ref('');
 const status = ref('');
+const ownerId = ref('');
+const closePeriod = ref('');
+const selectedDealId = ref(null);
 
 const uiFlags = computed(() => store.getUIFlags);
+const showArchived = computed(() => store.getShowArchived);
 const stages = computed(() => store.getStages);
 const selectedPipelineId = computed({
   get: () => store.getSelectedPipeline?.id ?? '',
@@ -42,6 +86,22 @@ const sourceOptions = computed(() => [
     value: source.id,
     label: source.name,
   })),
+]);
+
+const ownerOptions = computed(() => [
+  { value: '', label: t('CRM.FILTERS.ALL_OWNERS') },
+  ...agents.value.map(agent => ({
+    value: agent.id,
+    label: agent.available_name || agent.name,
+  })),
+]);
+
+const closePeriodOptions = computed(() => [
+  { value: '', label: t('CRM.FILTERS.ALL_CLOSE_PERIODS') },
+  { value: 'overdue', label: t('CRM.FILTERS.CLOSE_PERIOD.OVERDUE') },
+  { value: 'this_week', label: t('CRM.FILTERS.CLOSE_PERIOD.THIS_WEEK') },
+  { value: 'this_month', label: t('CRM.FILTERS.CLOSE_PERIOD.THIS_MONTH') },
+  { value: 'next_30_days', label: t('CRM.FILTERS.CLOSE_PERIOD.NEXT_30_DAYS') },
 ]);
 
 const statusOptions = computed(() => [
@@ -68,12 +128,18 @@ const applyFilters = useDebounceFn(() => {
     ...(searchQuery.value.trim() ? { q: searchQuery.value.trim() } : {}),
     ...(sourceId.value ? { source_id: sourceId.value } : {}),
     ...(status.value ? { status: status.value } : {}),
+    ...(ownerId.value ? { owner_id: ownerId.value } : {}),
+    ...(closePeriod.value ? CLOSE_PERIODS[closePeriod.value]() : {}),
   });
 }, SEARCH_DEBOUNCE_MS);
 
-watch([searchQuery, sourceId, status], applyFilters);
+watch([searchQuery, sourceId, status, ownerId, closePeriod], applyFilters);
+
+const toggleArchived = () => store.setShowArchived(!showArchived.value);
 
 onMounted(async () => {
+  rootStore.dispatch('agents/get');
+
   const [pipelines] = await Promise.all([
     store.fetchPipelines(),
     store.fetchLostReasons(),
@@ -107,12 +173,34 @@ onMounted(async () => {
       />
       <Select v-model="sourceId" :options="sourceOptions" />
       <Select v-model="status" :options="statusOptions" />
+      <Select v-model="ownerId" :options="ownerOptions" />
+      <Select v-model="closePeriod" :options="closePeriodOptions" />
+      <Button
+        size="sm"
+        :variant="showArchived ? 'solid' : 'faded'"
+        color="slate"
+        icon="i-lucide-archive"
+        :label="
+          showArchived
+            ? t('CRM.BOARD.BACK_TO_BOARD')
+            : t('CRM.BOARD.SHOW_ARCHIVED')
+        "
+        @click="toggleArchived"
+      />
       <Spinner
         v-if="uiFlags.fetchingDeals || uiFlags.movingDeal"
         :size="16"
         class="text-n-slate-11"
       />
     </header>
+
+    <div
+      v-if="showArchived"
+      class="flex items-center gap-2 px-6 py-2 bg-n-amber-3 text-n-amber-11"
+    >
+      <Icon icon="i-lucide-archive" class="flex-shrink-0 size-4" />
+      <span class="text-sm">{{ t('CRM.BOARD.ARCHIVED_HINT') }}</span>
+    </div>
 
     <div
       v-if="bannerMessageKey"
@@ -137,8 +225,19 @@ onMounted(async () => {
       {{ t('CRM.BOARD.EMPTY_STATE') }}
     </div>
     <div v-else class="flex flex-1 min-h-0 gap-4 px-6 py-4 overflow-x-auto">
-      <BoardColumn v-for="stage in stages" :key="stage.id" :stage="stage" />
+      <BoardColumn
+        v-for="stage in stages"
+        :key="stage.id"
+        :stage="stage"
+        @select-deal="selectedDealId = $event"
+      />
     </div>
+
+    <DealDrawer
+      v-if="selectedDealId"
+      :deal-id="selectedDealId"
+      @close="selectedDealId = null"
+    />
 
     <LostReasonModal />
   </main>

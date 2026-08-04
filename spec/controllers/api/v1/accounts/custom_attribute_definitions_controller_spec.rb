@@ -29,6 +29,20 @@ RSpec.describe 'Custom Attribute Definitions API', type: :request do
         expect(response_body.count).to eq(2)
         expect(response_body.first['attribute_key']).to eq(custom_attribute_definition.attribute_key)
       end
+
+      # The CRM board reads its custom fields from this same endpoint instead of a registry of
+      # its own, so the deal definitions have to be reachable through `attribute_model`.
+      it 'filters the definitions of the CRM deals' do
+        deal_definition = create(:custom_attribute_definition, attribute_model: 'deal_attribute', account: account)
+
+        get "/api/v1/accounts/#{account.id}/custom_attribute_definitions",
+            params: { attribute_model: 'deal_attribute' },
+            headers: admin.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body.pluck('id')).to eq([deal_definition.id])
+      end
     end
   end
 

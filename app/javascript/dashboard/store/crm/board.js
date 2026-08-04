@@ -61,6 +61,9 @@ export const useCrmBoardStore = defineStore('crmBoard', {
     lostReasons: [],
     sources: [],
     filters: {},
+    // The archived view swaps the whole board for the cards that left it, so it is a mode and
+    // not one more entry in `filters`: it changes what the columns are listing.
+    showArchived: false,
     uiFlags: {
       fetchingPipelines: false,
       fetchingStages: false,
@@ -83,6 +86,9 @@ export const useCrmBoardStore = defineStore('crmBoard', {
     getLostReasons: state => state.lostReasons,
     getSources: state => state.sources,
     getUIFlags: state => state.uiFlags,
+    getFilters: state => state.filters,
+    getShowArchived: state => state.showArchived,
+    hasActiveFilters: state => Object.keys(state.filters).length > 0,
     getMoveError: state => state.moveError,
     getPendingLostReasonMove: state => state.pendingLostReasonMove,
 
@@ -119,7 +125,7 @@ export const useCrmBoardStore = defineStore('crmBoard', {
     async fetchStages(pipelineId) {
       this.uiFlags.fetchingStages = true;
       try {
-        const { data } = await CrmStagesAPI.getStages(pipelineId);
+        const { data } = await CrmStagesAPI.getStages(pipelineId, this.filters);
         // The server totals are authoritative: replacing the whole list discards whatever the
         // board had adjusted locally instead of accumulating on top of it.
         this.stages = data.payload;
@@ -151,6 +157,7 @@ export const useCrmBoardStore = defineStore('crmBoard', {
           stage_id: stageId,
           page,
           ...this.filters,
+          ...(this.showArchived ? { archived: true } : {}),
         });
         const records = data.payload.map(normalizeDeal);
         const existing = page === 1 ? [] : this.deals[stageId] || [];
@@ -199,8 +206,18 @@ export const useCrmBoardStore = defineStore('crmBoard', {
       await this.fetchBoardDeals();
     },
 
+    // The stage index is refetched along with the cards because the filtered totals in the column
+    // headers are computed server side from the very same filters.
     async setFilters(filters = {}) {
       this.filters = filters;
+      await this.fetchStages(this.selectedPipelineId);
+      await this.fetchBoardDeals();
+    },
+
+    async setShowArchived(showArchived) {
+      this.showArchived = showArchived;
+      this.deals = {};
+      this.dealsMeta = {};
       await this.fetchBoardDeals();
     },
 
@@ -282,6 +299,19 @@ export const useCrmBoardStore = defineStore('crmBoard', {
         (stage.deals_value_cents || 0) + sign * (deal.value_cents || 0),
         0
       );
+
+      // `filtered_*` only comes back while the board has filters applied. The card being moved is
+      // on screen, so it passed the filter and belongs to that subtotal too.
+      if (stage.filtered_deals_count === undefined) return;
+
+      stage.filtered_deals_count = Math.max(
+        stage.filtered_deals_count + sign,
+        0
+      );
+      stage.filtered_deals_value_cents = Math.max(
+        stage.filtered_deals_value_cents + sign * (deal.value_cents || 0),
+        0
+      );
     },
 
     upsertDeal(payload) {
@@ -329,6 +359,18 @@ export const useCrmBoardStore = defineStore('crmBoard', {
       this.removeDeal(Number(dealId));
     },
 
+    /**
+     * The restored card leaves the archived listing and joins the board, so which of the two the
+     * user is looking at decides whether it is dropped or re-inserted.
+     */
+    async unarchiveDeal(dealId) {
+      const { data } = await CrmDealsAPI.unarchive(dealId);
+      if (!this.showArchived) return this.upsertDeal(data);
+
+      this.removeDeal(Number(dealId));
+      return normalizeDeal(data);
+    },
+
     // --- move internals -----------------------------------------------------------------
 
     captureSnapshot() {
@@ -351,6 +393,8 @@ export const useCrmBoardStore = defineStore('crmBoard', {
           id: stage.id,
           count: stage.deals_count,
           valueCents: stage.deals_value_cents,
+          filteredCount: stage.filtered_deals_count,
+          filteredValueCents: stage.filtered_deals_value_cents,
         })),
       };
     },
@@ -364,6 +408,10 @@ export const useCrmBoardStore = defineStore('crmBoard', {
 
         stage.deals_count = entry.count;
         stage.deals_value_cents = entry.valueCents;
+        if (entry.filteredCount === undefined) return;
+
+        stage.filtered_deals_count = entry.filteredCount;
+        stage.filtered_deals_value_cents = entry.filteredValueCents;
       });
     },
 

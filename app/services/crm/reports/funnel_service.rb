@@ -3,11 +3,11 @@
 # `crm_stage_transitions` is the source of truth, never the current `stage_id` of the deal: a card
 # that already went through Qualification and now sits in Proposal has to count for both.
 #
-# A deal "visited" a stage when a transition points AT it (`to_stage_id`), when it LEFT it
-# (`from_stage_id` — which is what covers the stage the deal was created in, since creation writes
-# no transition) or when it is sitting there right now (the only signal for a deal that never
-# moved). The three sets are UNIONed, so a card that bounced back into the same stage twice is
-# still counted once.
+# A deal "visited" a stage when a transition points AT it (`to_stage_id`), and that is the whole
+# rule: creating a deal writes a transition into its initial stage (`from_stage_id` NULL), so the
+# entry into the funnel is recorded like any other move and the top of the funnel counts every
+# card that ever entered it. The set is DISTINCT, so a card that bounced back into the same stage
+# twice is still counted once.
 #
 # "Advanced" means the deal reached, at any point, a stage positioned after this one in the
 # pipeline; the conversion rate is that count over the deals that entered.
@@ -40,19 +40,11 @@ class Crm::Reports::FunnelService < Crm::Reports::BaseService
   # the pipeline filter and the date range all ride along.
   def funnel_sql
     <<~SQL.squish
-      WITH scoped_deals AS (#{deals_between(:created_at).select(:id, :stage_id).to_sql}),
+      WITH scoped_deals AS (#{deals_between(:created_at).select(:id).to_sql}),
       visits AS (
-        SELECT t.deal_id, t.to_stage_id AS stage_id
+        SELECT DISTINCT t.deal_id, t.to_stage_id AS stage_id
           FROM crm_stage_transitions t
           JOIN scoped_deals d ON d.id = t.deal_id
-        UNION
-        SELECT t.deal_id, t.from_stage_id AS stage_id
-          FROM crm_stage_transitions t
-          JOIN scoped_deals d ON d.id = t.deal_id
-         WHERE t.from_stage_id IS NOT NULL
-        UNION
-        SELECT d.id AS deal_id, d.stage_id
-          FROM scoped_deals d
       ),
       positioned AS (
         SELECT v.deal_id, v.stage_id, s.position

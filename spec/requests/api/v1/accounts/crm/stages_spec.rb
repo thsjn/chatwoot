@@ -59,6 +59,70 @@ RSpec.describe 'CRM Stages API', type: :request do
         expect(payload['deals_value_cents']).to eq(100_000)
       end
 
+      # The header of a column publishes two numbers: the total of the stage, which is what the WIP
+      # limit is about, and the total restricted to the board filters, which is what the cards
+      # below it add up to.
+      describe 'filtered aggregates' do
+        before do
+          create(:crm_deal, account: account, pipeline: pipeline, stage: stage, title: 'Fazenda Boa Vista', value_cents: 30_000)
+          create(:crm_deal, account: account, pipeline: pipeline, stage: stage, title: 'Sitio Sao Jorge', value_cents: 70_000)
+        end
+
+        it 'mirrors the stage total when no filter is applied' do
+          get "/api/v1/accounts/#{account.id}/crm/pipelines/#{pipeline.id}/stages",
+              headers: admin.create_new_auth_token, as: :json
+
+          payload = response.parsed_body['payload'].find { |stage_payload| stage_payload['id'] == stage.id }
+          expect(payload).to include('deals_count' => 2, 'deals_value_cents' => 100_000,
+                                     'filtered_deals_count' => 2, 'filtered_deals_value_cents' => 100_000)
+        end
+
+        it 'restricts the filtered aggregate to the search term while keeping the stage total intact' do
+          get "/api/v1/accounts/#{account.id}/crm/pipelines/#{pipeline.id}/stages",
+              params: { q: 'Boa Vista' }, headers: admin.create_new_auth_token, as: :json
+
+          payload = response.parsed_body['payload'].find { |stage_payload| stage_payload['id'] == stage.id }
+          expect(payload).to include('deals_count' => 2, 'deals_value_cents' => 100_000,
+                                     'filtered_deals_count' => 1, 'filtered_deals_value_cents' => 30_000)
+        end
+
+        it 'accepts the same owner and source filters as the deals index' do
+          owned = create(:crm_deal, account: account, pipeline: pipeline, stage: stage, owner: agent, value_cents: 11_000)
+
+          get "/api/v1/accounts/#{account.id}/crm/pipelines/#{pipeline.id}/stages",
+              params: { owner_id: agent.id }, headers: admin.create_new_auth_token, as: :json
+
+          payload = response.parsed_body['payload'].find { |stage_payload| stage_payload['id'] == stage.id }
+          expect(payload['deals_count']).to eq(3)
+          expect(payload['filtered_deals_count']).to eq(1)
+          expect(payload['filtered_deals_value_cents']).to eq(owned.value_cents)
+        end
+
+        it 'follows the status filter instead of the still in play default' do
+          create(:crm_deal, :won, account: account, pipeline: pipeline, stage: stage, value_cents: 90_000)
+
+          get "/api/v1/accounts/#{account.id}/crm/pipelines/#{pipeline.id}/stages",
+              params: { status: 'won' }, headers: admin.create_new_auth_token, as: :json
+
+          payload = response.parsed_body['payload'].find { |stage_payload| stage_payload['id'] == stage.id }
+          expect(payload['deals_count']).to eq(2)
+          expect(payload['filtered_deals_count']).to eq(1)
+          expect(payload['filtered_deals_value_cents']).to eq(90_000)
+        end
+
+        it 'never counts an archived card on either number' do
+          create(:crm_deal, :archived, account: account, pipeline: pipeline, stage: stage,
+                                       title: 'Fazenda Boa Vista II', value_cents: 500_000)
+
+          get "/api/v1/accounts/#{account.id}/crm/pipelines/#{pipeline.id}/stages",
+              params: { q: 'Boa Vista' }, headers: admin.create_new_auth_token, as: :json
+
+          payload = response.parsed_body['payload'].find { |stage_payload| stage_payload['id'] == stage.id }
+          expect(payload['deals_count']).to eq(2)
+          expect(payload['filtered_deals_count']).to eq(1)
+        end
+      end
+
       it 'returns zeroed totals for a stage without deals' do
         get "/api/v1/accounts/#{account.id}/crm/pipelines/#{pipeline.id}/stages",
             headers: admin.create_new_auth_token, as: :json

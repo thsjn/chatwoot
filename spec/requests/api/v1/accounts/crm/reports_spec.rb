@@ -18,17 +18,21 @@ RSpec.describe 'CRM Reports API', type: :request do
   let(:base_url) { "/api/v1/accounts/#{account.id}/crm/reports" }
 
   describe 'GET /crm/reports/funnel' do
-    # deal_a: Novo -> Qualificacao          (visited Novo, Qualificacao)
+    # Every deal is born in Novo, and creating it already records the transition into that stage,
+    # so the trail below is the whole story of each card:
+    # deal_a: Novo -> Qualificacao             (visited Novo, Qualificacao)
     # deal_b: Novo -> Qualificacao -> Proposta (visited Novo, Qualificacao, Proposta)
-    # deal_c: created in Novo, never moved  (visited Novo)
-    let!(:deal_a) { create(:crm_deal, account: account, pipeline: pipeline, stage: qualificacao) }
-    let!(:deal_b) { create(:crm_deal, account: account, pipeline: pipeline, stage: proposta) }
+    # deal_c: created in Novo, never moved     (visited Novo)
+    let!(:deal_a) { create(:crm_deal, account: account, pipeline: pipeline, stage: novo) }
+    let!(:deal_b) { create(:crm_deal, account: account, pipeline: pipeline, stage: novo) }
     let!(:deal_c) { create(:crm_deal, account: account, pipeline: pipeline, stage: novo) }
 
     before do
       create(:crm_stage_transition, deal: deal_a, from_stage: novo, to_stage: qualificacao, duration_seconds: 100)
+      deal_a.update!(stage: qualificacao)
       create(:crm_stage_transition, deal: deal_b, from_stage: novo, to_stage: qualificacao, duration_seconds: 200)
       create(:crm_stage_transition, deal: deal_b, from_stage: qualificacao, to_stage: proposta, duration_seconds: 60)
+      deal_b.update!(stage: proposta)
     end
 
     context 'when unauthenticated' do
@@ -59,6 +63,32 @@ RSpec.describe 'CRM Reports API', type: :request do
       get "#{base_url}/funnel", params: { pipeline_id: pipeline.id }, headers: agent.create_new_auth_token, as: :json
 
       expect(response).to have_http_status(:success)
+    end
+
+    # The top of the funnel used to be inferred from the origin stage of the first recorded move,
+    # so it depended on the card having moved at least once. It now reads the transition written
+    # when the deal was created, which every deal has.
+    it 'counts a deal created straight into a middle stage in that stage and not in the ones before it' do
+      create(:crm_deal, account: account, pipeline: pipeline, stage: proposta)
+
+      get "#{base_url}/funnel", params: { pipeline_id: pipeline.id }, headers: admin.create_new_auth_token, as: :json
+
+      payload = response.parsed_body['payload'].index_by { |row| row['name'] }
+      expect(payload['Novo']['entered_count']).to eq(3)
+      expect(payload['Qualificacao']['entered_count']).to eq(2)
+      expect(payload['Proposta']['entered_count']).to eq(2)
+    end
+
+    it 'counts a deal ingested from a conversation in the entry stage of its pipeline' do
+      inbox = create(:inbox, account: account)
+      pipeline.update!(settings: pipeline.settings.merge('inbox_ids' => [inbox.id]))
+      conversation = create(:conversation, account: account, inbox: inbox, contact: create(:contact, account: account))
+      Crm::IngestConversationService.new(conversation: conversation).perform
+
+      get "#{base_url}/funnel", params: { pipeline_id: pipeline.id }, headers: admin.create_new_auth_token, as: :json
+
+      payload = response.parsed_body['payload'].index_by { |row| row['name'] }
+      expect(payload['Novo']['entered_count']).to eq(4)
     end
 
     it 'ignores archived deals' do

@@ -1,7 +1,9 @@
 class Api::V1::Accounts::Crm::DealsController < Api::V1::Accounts::BaseController
+  include Crm::DealFilterable
+
   RESULTS_PER_PAGE = 25
 
-  before_action :fetch_deal, only: [:show, :update, :destroy, :move]
+  before_action :fetch_deal, only: [:show, :update, :destroy, :move, :unarchive]
   before_action :authorize_deal, except: [:move]
   before_action :set_current_page, only: [:index]
 
@@ -18,6 +20,8 @@ class Api::V1::Accounts::Crm::DealsController < Api::V1::Accounts::BaseControlle
   def create
     @deal = Crm::Deal.new(permitted_params.merge(account_id: Current.account.id))
     @deal.stage ||= @deal.pipeline&.entry_stage
+    # Creating a card is the first transition of the funnel and is credited to whoever did it.
+    @deal.creation_user = Current.user
     @deal.save!
   end
 
@@ -30,6 +34,14 @@ class Api::V1::Accounts::Crm::DealsController < Api::V1::Accounts::BaseControlle
   def destroy
     @deal.archive!
     head :ok
+  end
+
+  # Archiving is reversible: without this the card would leave the board for good, and the only
+  # way back would be the database. The archived cards are reachable through `index` with
+  # `archived=true`.
+  def unarchive
+    @deal.unarchive!
+    render 'show'
   end
 
   def move
@@ -67,15 +79,12 @@ class Api::V1::Accounts::Crm::DealsController < Api::V1::Accounts::BaseControlle
 
   # `policy_scope` carries the `restrito_por_owner` rule, so the visibility filtering is never
   # rebuilt here: this method only applies the board filters on top of it.
+  # `archived=true` lists the archived cards instead of the board ones, which is how the UI offers
+  # a card back to be restored through `unarchive`.
   def filtered_deals
-    scope = policy_scope(Crm::Deal).active
-    scope = scope.where(pipeline_id: params[:pipeline_id]) if params[:pipeline_id].present?
-    scope = scope.where(stage_id: params[:stage_id]) if params[:stage_id].present?
-    scope = scope.where(owner_id: params[:owner_id]) if params[:owner_id].present?
-    scope = scope.where(source_id: params[:source_id]) if params[:source_id].present?
-    scope = scope.where(status: params[:status]) if Crm::Deal.statuses.key?(params[:status])
-    scope = scope.where('crm_deals.title ILIKE :search', search: "%#{params[:q].strip}%") if params[:q].present?
-    scope
+    scope = policy_scope(Crm::Deal)
+    scope = ActiveModel::Type::Boolean.new.cast(params[:archived]) ? scope.archived : scope.active
+    apply_deal_filters(scope)
   end
 
   def destination_stage

@@ -104,6 +104,12 @@ class Crm::Deal < ApplicationRecord
 
   enum status: { open: 0, won: 1, lost: 2 }
 
+  # Creation is the first step of the funnel, so it is recorded as a transition with no origin
+  # stage (see `record_creation_transition`). These accessors carry the little context the
+  # audit entry needs and that the record itself cannot know: who created the card and whether
+  # it came from the conversation ingestion instead of a human action.
+  attr_accessor :creation_user, :creation_automated
+
   validates :title, presence: true
   validates :currency, presence: true
   validates :value_cents, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
@@ -120,8 +126,11 @@ class Crm::Deal < ApplicationRecord
   validate :source_must_belong_to_account
   validate :source_inbox_must_belong_to_account
   validate :lost_reason_must_belong_to_account
+  validate :lost_reason_must_be_active
+  validate :custom_attributes_must_be_defined
 
   before_create :ensure_stage_entered_at
+  after_create :record_creation_transition
 
   scope :active, -> { where(archived_at: nil) }
   scope :archived, -> { where.not(archived_at: nil) }
@@ -168,6 +177,20 @@ class Crm::Deal < ApplicationRecord
 
   def ensure_stage_entered_at
     self.stage_entered_at ||= Time.current
+  end
+
+  # The entry into the first stage is a real step of the funnel and has to be auditable like any
+  # other move, otherwise the report has to guess where the card came into the pipeline. It is
+  # written here (and not in the callers) so every path that creates a deal — the API, the
+  # conversation ingestion, a seed — produces the same history.
+  # `from_stage_id` is NULL because there is no origin stage, and `duration_seconds` is NULL
+  # because no time was spent anywhere before this.
+  def record_creation_transition
+    Crm::StageTransition.create!(
+      deal: self, from_stage_id: nil, to_stage_id: stage_id,
+      user: creation_user, duration_seconds: nil,
+      automated: ActiveModel::Type::Boolean.new.cast(creation_automated).present?
+    )
   end
 
   # `pipeline`, `stage` and `contact` are already loaded by the `belongs_to` presence
@@ -219,5 +242,35 @@ class Crm::Deal < ApplicationRecord
     return if lost_reason.blank? || lost_reason.account_id == account_id
 
     errors.add(:lost_reason_id, 'must belong to the same account as the deal')
+  end
+
+  # A reason turned off must not be picked again, but deactivating one cannot make the deals that
+  # already carry it unsaveable, so the check only runs when the reason is being assigned.
+  def lost_reason_must_be_active
+    return if lost_reason.blank? || !lost_reason_id_changed? || lost_reason.active?
+
+    errors.add(:lost_reason_id, 'must be an active lost reason')
+  end
+
+  # Custom fields are the account's `custom_attribute_definitions` scoped to `deal_attribute`, the
+  # same registry the rest of Chatwoot uses for contacts and conversations. Anything outside it is
+  # a typo or a stale client, and letting it through would silently create a field nobody can read
+  # back on the UI. A `list` definition goes one step further and is a closed set of options, so a
+  # value outside it would render as an empty select.
+  def custom_attributes_must_be_defined
+    return unless custom_attributes_changed?
+    return if custom_attributes.blank? || account_id.blank?
+
+    definitions = CustomAttributeDefinition.where(account_id: account_id).deal_attribute.index_by(&:attribute_key)
+
+    custom_attributes.each do |key, value|
+      definition = definitions[key.to_s]
+
+      if definition.nil?
+        errors.add(:custom_attributes, "#{key} is not a custom attribute defined for deals")
+      elsif definition.list? && value.present? && definition.attribute_values.to_a.map(&:to_s).exclude?(value.to_s)
+        errors.add(:custom_attributes, "#{key} must be one of the values defined for it")
+      end
+    end
   end
 end

@@ -12,8 +12,10 @@ class CrmStages extends ApiClient {
     return `${this.url}/${pipelineId}/stages`;
   }
 
-  getStages(pipelineId) {
-    return axios.get(this.stagesUrl(pipelineId));
+  // The board filters travel with the stage index so the headers can report how much of each
+  // column survives the current filter (`filtered_deals_count`/`filtered_deals_value_cents`).
+  getStages(pipelineId, params = {}) {
+    return axios.get(this.stagesUrl(pipelineId), { params });
   }
 
   showStage(pipelineId, stageId) {

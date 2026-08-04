@@ -31,6 +31,105 @@ RSpec.describe Crm::Deal do
       expect(deal).not_to be_valid
       expect(deal.errors[:value_cents]).to be_present
     end
+
+    it 'rejects a lost reason the account deactivated' do
+      deal = build(:crm_deal, account: account, pipeline: pipeline, stage: stage,
+                              lost_reason: create(:crm_lost_reason, :inactive, account: account))
+
+      expect(deal).not_to be_valid
+      expect(deal.errors[:lost_reason_id]).to be_present
+    end
+
+    it 'accepts an active lost reason' do
+      deal = build(:crm_deal, account: account, pipeline: pipeline, stage: stage,
+                              lost_reason: create(:crm_lost_reason, account: account))
+
+      expect(deal).to be_valid
+    end
+
+    # Turning a reason off must not freeze the cards already carrying it: they would become
+    # unsaveable and any later edit would fail for an unrelated reason.
+    it 'keeps a deal saveable after its lost reason is deactivated' do
+      lost_reason = create(:crm_lost_reason, account: account)
+      deal = create(:crm_deal, account: account, pipeline: pipeline, stage: stage, lost_reason: lost_reason)
+      lost_reason.update!(active: false)
+
+      expect { deal.update!(title: 'Renomeado') }.not_to raise_error
+    end
+  end
+
+  # Deals reuse the account's `custom_attribute_definitions` (the same registry contacts and
+  # conversations use) under the `deal_attribute` model, instead of a parallel definition table.
+  describe 'custom attributes' do
+    before do
+      create(:custom_attribute_definition, account: account, attribute_model: :deal_attribute,
+                                           attribute_key: 'hectares', attribute_display_type: :number)
+    end
+
+    it 'accepts a key defined for deals in the account' do
+      expect(build(:crm_deal, account: account, pipeline: pipeline, stage: stage, custom_attributes: { 'hectares' => 320 })).to be_valid
+    end
+
+    it 'rejects a key with no definition' do
+      deal = build(:crm_deal, account: account, pipeline: pipeline, stage: stage, custom_attributes: { 'inexistente' => 1 })
+
+      expect(deal).not_to be_valid
+      expect(deal.errors[:custom_attributes]).to be_present
+    end
+
+    it 'rejects a definition of another attribute model' do
+      create(:custom_attribute_definition, account: account, attribute_model: :contact_attribute, attribute_key: 'cpf')
+      deal = build(:crm_deal, account: account, pipeline: pipeline, stage: stage, custom_attributes: { 'cpf' => '123' })
+
+      expect(deal).not_to be_valid
+    end
+
+    it 'rejects a definition of another account' do
+      create(:custom_attribute_definition, account: other_account, attribute_model: :deal_attribute, attribute_key: 'safra')
+      deal = build(:crm_deal, account: account, pipeline: pipeline, stage: stage, custom_attributes: { 'safra' => '2026' })
+
+      expect(deal).not_to be_valid
+    end
+
+    it 'rejects a value outside the options of a list definition' do
+      create(:custom_attribute_definition, account: account, attribute_model: :deal_attribute, attribute_key: 'regiao',
+                                           attribute_display_type: :list, attribute_values: %w[norte sul])
+      deal = build(:crm_deal, account: account, pipeline: pipeline, stage: stage, custom_attributes: { 'regiao' => 'leste' })
+
+      expect(deal).not_to be_valid
+    end
+
+    it 'accepts a value listed by a list definition' do
+      create(:custom_attribute_definition, account: account, attribute_model: :deal_attribute, attribute_key: 'regiao',
+                                           attribute_display_type: :list, attribute_values: %w[norte sul])
+
+      expect(build(:crm_deal, account: account, pipeline: pipeline, stage: stage, custom_attributes: { 'regiao' => 'sul' })).to be_valid
+    end
+  end
+
+  # Entering the pipeline is a step of the funnel like any other, so it is recorded here and not
+  # in the callers: the API, the conversation ingestion and a seed all produce the same trail.
+  describe 'creation transition' do
+    it 'records a transition into the initial stage with no origin stage' do
+      deal = create(:crm_deal, account: account, pipeline: pipeline, stage: stage)
+
+      transition = deal.stage_transitions.sole
+      expect(transition).to have_attributes(from_stage_id: nil, to_stage_id: stage.id, duration_seconds: nil, automated: false)
+      expect(transition.user_id).to be_nil
+    end
+
+    it 'credits the transition to the user who created the deal' do
+      user = create(:user, account: account, role: :agent)
+      deal = create(:crm_deal, account: account, pipeline: pipeline, stage: stage, creation_user: user)
+
+      expect(deal.stage_transitions.sole.user_id).to eq(user.id)
+    end
+
+    it 'flags the transition as automated when the card came from the ingestion' do
+      deal = create(:crm_deal, account: account, pipeline: pipeline, stage: stage, creation_automated: true)
+
+      expect(deal.stage_transitions.sole.automated).to be(true)
+    end
   end
 
   describe 'cross account isolation' do

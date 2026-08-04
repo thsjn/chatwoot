@@ -7,11 +7,22 @@
       "ADD_DEAL": "Adicionar oportunidade",
       "SEARCH_PLACEHOLDER": "Buscar oportunidades por título",
       "LOAD_MORE": "Carregar mais",
-      "DISMISS": "Dispensar"
+      "DISMISS": "Dispensar",
+      "SHOW_ARCHIVED": "Arquivadas",
+      "BACK_TO_BOARD": "Voltar ao quadro",
+      "ARCHIVED_HINT": "Exibindo oportunidades arquivadas. Abra um card para restaurá-lo."
     },
     "FILTERS": {
       "ALL_SOURCES": "Todas as origens",
       "ALL_STATUSES": "Todos os status",
+      "ALL_OWNERS": "Todos os responsáveis",
+      "ALL_CLOSE_PERIODS": "Qualquer data de fechamento",
+      "CLOSE_PERIOD": {
+        "OVERDUE": "Em atraso",
+        "THIS_WEEK": "Fecham esta semana",
+        "THIS_MONTH": "Fecham este mês",
+        "NEXT_30_DAYS": "Fecham em 30 dias"
+      },
       "STATUS": {
         "OPEN": "Aberta",
         "WON": "Ganha",
@@ -26,7 +37,10 @@
     "STAGE": {
       "WIP_FULL": "Limite da coluna atingido",
       "WIP_COUNT": "{count} de {limit}",
-      "EMPTY": "Nenhuma oportunidade neste estágio"
+      "EMPTY": "Nenhuma oportunidade neste estágio",
+      "FILTERED_COUNT": "Filtradas: {count}",
+      "FILTERED_OF_TOTAL": "{filtered} de {total}",
+      "TOTAL_HINT": "Total neste estágio"
     },
     "DEAL": {
       "VALUE": "Valor da Oportunidade",
@@ -47,6 +61,11 @@
       "ARCHIVE_CONFIRM": "Confirmar arquivamento",
       "ARCHIVE_HINT": "O card sai do quadro",
       "ARCHIVE_SUCCESS": "Oportunidade arquivada",
+      "ARCHIVED_BADGE": "Arquivada",
+      "UNARCHIVE": "Restaurar",
+      "UNARCHIVE_SUCCESS": "Oportunidade restaurada para o quadro",
+      "UNARCHIVE_ERROR": "Não foi possível restaurar a oportunidade",
+      "CUSTOM_ATTRIBUTES": "Atributos personalizados",
       "STATUS_OPEN": "Aberta",
       "STATUS_WON": "Ganha",
       "STATUS_LOST": "Perdida",

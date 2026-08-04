@@ -13,6 +13,8 @@ const props = defineProps({
   stage: { type: Object, required: true },
 });
 
+const emit = defineEmits(['selectDeal']);
+
 // `stage.color` is a closed token set, so the classes are written as literals for the Tailwind
 // scanner to pick them up — an interpolated class name would never be emitted.
 const STAGE_ACCENT_CLASSES = {
@@ -36,6 +38,14 @@ const hasMoreDeals = computed(() => store.hasMoreDeals(props.stage.id));
 
 const accentClass = computed(() => STAGE_ACCENT_CLASSES[props.stage.color]);
 
+const isArchivedView = computed(() => store.getShowArchived);
+
+// The server only sends the `filtered_*` aggregates while the board has filters applied, so their
+// presence is what tells the header there are two numbers to report instead of one.
+const hasFilteredTotals = computed(
+  () => props.stage.filtered_deals_count !== undefined
+);
+
 // The board only holds the pages it has loaded, so the limit is checked against the stage total
 // the server reports — otherwise the alert only lights up after someone loads more cards.
 const isWipFull = computed(
@@ -45,14 +55,25 @@ const isWipFull = computed(
 
 // The total is the whole stage, not the loaded pages, and every deal carries its own currency,
 // so it is formatted with the pipeline currency instead of whichever card happens to be first.
+const currencyFormatter = computed(
+  () =>
+    new Intl.NumberFormat(resolvedLocale.value, {
+      style: 'currency',
+      currency:
+        store.getSelectedPipeline?.settings?.moeda_padrao || DEFAULT_CURRENCY,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    })
+);
+
 const formattedTotal = computed(() =>
-  new Intl.NumberFormat(resolvedLocale.value, {
-    style: 'currency',
-    currency:
-      store.getSelectedPipeline?.settings?.moeda_padrao || DEFAULT_CURRENCY,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format((props.stage.deals_value_cents || 0) / 100)
+  currencyFormatter.value.format((props.stage.deals_value_cents || 0) / 100)
+);
+
+const formattedFilteredTotal = computed(() =>
+  currencyFormatter.value.format(
+    (props.stage.filtered_deals_value_cents || 0) / 100
+  )
 );
 
 /**
@@ -88,27 +109,56 @@ const handleChange = event => {
             {{ stage.name }}
           </span>
         </div>
-        <span
-          class="flex-shrink-0 px-1.5 py-0.5 text-xs font-medium rounded-md tabular-nums"
-          :class="
-            isWipFull
-              ? 'bg-n-amber-3 text-n-amber-11'
-              : 'bg-n-alpha-2 text-n-slate-11'
-          "
+        <!-- The aggregates describe the active pipeline, so they step aside
+        while the column lists archived cards. -->
+        <div
+          v-if="!isArchivedView"
+          class="flex items-center flex-shrink-0 gap-1"
         >
-          {{
-            stage.wip_limit
-              ? t('CRM.STAGE.WIP_COUNT', {
-                  count: stage.deals_count,
-                  limit: stage.wip_limit,
-                })
-              : stage.deals_count
-          }}
-        </span>
+          <span
+            v-if="hasFilteredTotals"
+            class="flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded-md tabular-nums bg-n-blue-3 text-n-blue-11"
+          >
+            <span class="i-lucide-filter size-3" />
+            {{
+              t('CRM.STAGE.FILTERED_COUNT', {
+                count: stage.filtered_deals_count,
+              })
+            }}
+          </span>
+          <span
+            class="px-1.5 py-0.5 text-xs font-medium rounded-md tabular-nums"
+            :class="
+              isWipFull
+                ? 'bg-n-amber-3 text-n-amber-11'
+                : 'bg-n-alpha-2 text-n-slate-11'
+            "
+            :title="t('CRM.STAGE.TOTAL_HINT')"
+          >
+            {{
+              stage.wip_limit
+                ? t('CRM.STAGE.WIP_COUNT', {
+                    count: stage.deals_count,
+                    limit: stage.wip_limit,
+                  })
+                : stage.deals_count
+            }}
+          </span>
+        </div>
       </div>
-      <div class="flex items-center justify-between gap-2">
+      <div
+        v-if="!isArchivedView"
+        class="flex items-center justify-between gap-2"
+      >
         <span class="text-xs tabular-nums text-n-slate-11">
-          {{ formattedTotal }}
+          {{
+            hasFilteredTotals
+              ? t('CRM.STAGE.FILTERED_OF_TOTAL', {
+                  filtered: formattedFilteredTotal,
+                  total: formattedTotal,
+                })
+              : formattedTotal
+          }}
         </span>
         <span v-if="isWipFull" class="text-xs font-medium text-n-amber-11">
           {{ t('CRM.STAGE.WIP_FULL') }}
@@ -123,10 +173,15 @@ const handleChange = event => {
         :group="{ name: 'crmDeals' }"
         ghost-class="opacity-40"
         class="flex flex-col gap-2 p-2 min-h-[5rem]"
+        :disabled="isArchivedView"
         @change="handleChange"
       >
         <template #item="{ element }">
-          <DealCard :deal="element" :rotting-days="stage.rotting_days" />
+          <DealCard
+            :deal="element"
+            :rotting-days="stage.rotting_days"
+            @click="emit('selectDeal', element.id)"
+          />
         </template>
       </Draggable>
 

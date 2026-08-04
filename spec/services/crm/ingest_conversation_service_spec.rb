@@ -80,6 +80,14 @@ describe Crm::IngestConversationService do
         expect(described_class.new(conversation: conversation).perform).to eq({ created: 1, linked: 0 })
       end
 
+      it 'records the entry into the funnel as an automated transition' do
+        described_class.new(conversation: conversation).perform
+
+        transition = Crm::Deal.last.stage_transitions.chronological.first
+        expect(transition).to have_attributes(from_stage_id: nil, to_stage_id: entry_stage.id, duration_seconds: nil, automated: true)
+        expect(transition.user_id).to be_nil
+      end
+
       context 'when the contact has no name' do
         let(:contact) { create(:contact, account: account, name: '', email: 'maria@example.com') }
 
@@ -108,6 +116,43 @@ describe Crm::IngestConversationService do
 
           expect(Crm::Deal.last.source_id).to be_nil
         end
+      end
+    end
+
+    # Two conversations of the same contact arriving together (routine on WhatsApp) would both read
+    # "no deal yet" and both create a card. Real concurrency is not reproducible in a spec that runs
+    # inside a single transaction, so what is asserted here is that the read-then-write is guarded
+    # by a transaction scoped advisory lock keyed by the exact pair being deduplicated.
+    describe 'dedupe serialisation' do
+      let(:expected_lock_key) { Zlib.crc32("crm_ingest_deal_#{account.id}_#{pipeline.id}_#{contact.id}") }
+
+      it 'takes a transaction advisory lock keyed by account, pipeline and contact' do
+        allow(ActiveRecord::Base.connection).to receive(:execute).and_call_original
+
+        described_class.new(conversation: conversation).perform
+
+        expect(ActiveRecord::Base.connection).to have_received(:execute).with("SELECT pg_advisory_xact_lock(#{expected_lock_key})").once
+      end
+
+      it 'takes one lock per matching pipeline, so two pipelines never share a slot' do
+        second_pipeline = create(:crm_pipeline, account: account,
+                                                settings: { 'inbox_ids' => [inbox.id], 'janela_dedupe_dias' => 30 })
+        create(:crm_stage, :entry, account: account, pipeline: second_pipeline, position: 1000)
+        second_key = Zlib.crc32("crm_ingest_deal_#{account.id}_#{second_pipeline.id}_#{contact.id}")
+        allow(ActiveRecord::Base.connection).to receive(:execute).and_call_original
+
+        described_class.new(conversation: conversation).perform
+
+        expect(ActiveRecord::Base.connection).to have_received(:execute).with("SELECT pg_advisory_xact_lock(#{expected_lock_key})").once
+        expect(ActiveRecord::Base.connection).to have_received(:execute).with("SELECT pg_advisory_xact_lock(#{second_key})").once
+      end
+
+      it 'does not lock anything on a dry run' do
+        allow(ActiveRecord::Base.connection).to receive(:execute).and_call_original
+
+        described_class.new(conversation: conversation, dry_run: true).perform
+
+        expect(ActiveRecord::Base.connection).not_to have_received(:execute).with(/pg_advisory_xact_lock/)
       end
     end
 

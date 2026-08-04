@@ -195,6 +195,7 @@ Rails.application.routes.draw do
             end
             resources :deals, only: [:index, :show, :create, :update, :destroy] do
               patch :move, on: :member
+              patch :unarchive, on: :member
               resources :activities, only: [:index, :show, :create, :update, :destroy]
             end
             resources :sources, only: [:index, :show, :create, :update, :destroy]

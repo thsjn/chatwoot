@@ -18,6 +18,7 @@ import Select from 'dashboard/components-next/select/Select.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import TeleportWithDirection from 'dashboard/components-next/TeleportWithDirection.vue';
 import TextArea from 'dashboard/components-next/textarea/TextArea.vue';
+import DealCustomAttributes from './DealCustomAttributes.vue';
 
 const props = defineProps({
   dealId: { type: [Number, String], default: null },
@@ -62,6 +63,7 @@ const activities = ref([]);
 const isFetchingActivities = ref(false);
 const isSavingActivity = ref(false);
 const isArchiving = ref(false);
+const isUnarchiving = ref(false);
 
 const isEditingTitle = ref(false);
 const titleDraft = ref('');
@@ -79,6 +81,8 @@ const stage = computed(
   () =>
     boardStore.getStages.find(item => item.id === deal.value?.stage_id) || null
 );
+
+const isArchived = computed(() => Boolean(deal.value?.archived_at));
 
 const dealValue = computed(() => {
   const currentDeal = deal.value;
@@ -233,6 +237,22 @@ const archive = async () => {
   }
 };
 
+// Restoring is not destructive — the card simply goes back to its column — so it skips the
+// confirmation step that archiving needs.
+const unarchive = async () => {
+  const dealId = deal.value.id;
+  isUnarchiving.value = true;
+  try {
+    await boardStore.unarchiveDeal(dealId);
+    useAlert(t('CRM.DEAL.UNARCHIVE_SUCCESS'));
+    closeDrawer();
+  } catch (error) {
+    useAlert(t('CRM.DEAL.UNARCHIVE_ERROR'));
+  } finally {
+    isUnarchiving.value = false;
+  }
+};
+
 const createActivity = async payload => {
   isSavingActivity.value = true;
   try {
@@ -327,6 +347,7 @@ watch(
 onMounted(() => {
   store.dispatch('agents/get');
   store.dispatch('teams/get');
+  store.dispatch('attributes/get');
 });
 </script>
 
@@ -400,11 +421,29 @@ onMounted(() => {
               >
                 {{ $t(STATUS_LABELS[deal.status]) }}
               </span>
+              <span
+                v-if="isArchived"
+                class="flex items-center gap-1 rounded-md bg-n-amber-9/10 px-2 py-0.5 text-xs font-medium text-n-amber-11"
+              >
+                <span class="i-lucide-archive size-3" />
+                {{ $t('CRM.DEAL.ARCHIVED_BADGE') }}
+              </span>
             </div>
           </div>
 
           <div class="flex shrink-0 items-center gap-2">
+            <Button
+              v-if="isArchived"
+              faded
+              teal
+              size="sm"
+              icon="i-lucide-archive-restore"
+              :label="$t('CRM.DEAL.UNARCHIVE')"
+              :is-loading="isUnarchiving"
+              @click="unarchive"
+            />
             <ConfirmButton
+              v-else
               slate
               variant="faded"
               size="sm"
@@ -544,6 +583,8 @@ onMounted(() => {
               </div>
             </div>
           </section>
+
+          <DealCustomAttributes :deal="deal" />
 
           <section class="flex flex-col gap-2">
             <h3 class="mb-0 text-sm font-medium text-n-slate-12">
