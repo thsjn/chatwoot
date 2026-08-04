@@ -280,12 +280,19 @@ RSpec.describe 'CRM external lead ingestion API', type: :request do
     let(:throttle) { Rack::Attack.throttles['/public/api/v1/accounts/:account_id/crm/leads'] }
     let(:remote_headers) { headers.merge('REMOTE_ADDR' => '203.0.113.10') }
 
+    # Turning the flag on is not enough: the counters live in the app's Redis wrapper, which the test
+    # environment fakes, and the throttle blows up on it (the request comes back 500 instead of 429).
+    # A dedicated in-memory store — what rack-attack itself recommends for tests — makes the counting
+    # real without touching the app's Redis.
     around do |example|
       original_enabled = Rack::Attack.enabled
+      original_store = Rack::Attack.cache.store
+      Rack::Attack.cache.store = ActiveSupport::Cache::MemoryStore.new
       Rack::Attack.enabled = true
       example.run
     ensure
       Rack::Attack.enabled = original_enabled
+      Rack::Attack.cache.store = original_store
     end
 
     before { allow(throttle).to receive(:limit).and_return(1) }
