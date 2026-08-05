@@ -12,7 +12,9 @@ class Whatsapp::WebhookSetupService
     # Register phone number if either condition is met:
     # 1. Phone number is not verified (code_verification_status != 'VERIFIED')
     # 2. Phone number needs registration (pending provisioning state)
-    register_phone_number if !phone_number_verified? || phone_number_needs_registration?
+    # Coexistence numbers are already registered on the WhatsApp Business app; Meta requires
+    # skipping this step, and calling /register can break the coexistence link.
+    register_phone_number if !coexistence? && (!phone_number_verified? || phone_number_needs_registration?)
 
     setup_webhook
   end
@@ -29,6 +31,10 @@ class Whatsapp::WebhookSetupService
     raise ArgumentError, 'WABA ID is required' if @waba_id.blank?
     raise ArgumentError, 'Access token is required' if @access_token.blank?
     raise ArgumentError, 'Phone number ID is required' if @channel.provider_config['phone_number_id'].blank?
+  end
+
+  def coexistence?
+    ActiveModel::Type::Boolean.new.cast(@channel.provider_config['coexistence']) || false
   end
 
   def register_phone_number

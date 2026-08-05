@@ -29,7 +29,7 @@ class Api::V1::Accounts::Whatsapp::AuthorizationsController < Api::V1::Accounts:
   def process_embedded_signup
     service = Whatsapp::EmbeddedSignupService.new(
       account: Current.account,
-      params: params.permit(:code, :business_id, :waba_id, :phone_number_id).to_h.symbolize_keys,
+      params: params.permit(:code, :business_id, :waba_id, :phone_number_id, :coexistence).to_h.symbolize_keys,
       inbox_id: params[:inbox_id]
     )
     service.perform
@@ -82,10 +82,11 @@ class Api::V1::Accounts::Whatsapp::AuthorizationsController < Api::V1::Accounts:
     }, status: :unprocessable_entity
   end
 
+  # `business_id` is intentionally not required: the coexistence flow
+  # (FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING) only returns `waba_id`.
   def validate_embedded_signup_params!
     missing_params = []
     missing_params << 'code' if params[:code].blank?
-    missing_params << 'business_id' if params[:business_id].blank?
     missing_params << 'waba_id' if params[:waba_id].blank?
 
     return if missing_params.empty?

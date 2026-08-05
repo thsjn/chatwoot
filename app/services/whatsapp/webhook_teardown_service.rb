@@ -38,10 +38,17 @@ class Whatsapp::WebhookTeardownService
     Rails.logger.error "[WHATSAPP] Phone-level webhook clear failed for channel #{@channel.id}: #{e.message}"
   end
 
+  def coexistence?
+    ActiveModel::Type::Boolean.new.cast(provider_config['coexistence']) || false
+  end
+
   # Embedded signup only — deregistering a manually connected number disables it on the customer's own app.
   # Releases the number from our app so the customer can re-add it elsewhere.
+  # Coexistence numbers stay live on the customer's WhatsApp Business app, so deregistering would take
+  # the number down there — the mirror image of the /register call skipped on setup.
   def deregister_phone_number(api_client)
     return unless provider_config['source'] == 'embedded_signup'
+    return if coexistence?
 
     phone_number_id = provider_config['phone_number_id']
     return if phone_number_id.blank?

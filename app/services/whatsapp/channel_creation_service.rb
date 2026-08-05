@@ -1,9 +1,10 @@
 class Whatsapp::ChannelCreationService
-  def initialize(account, waba_info, phone_info, access_token)
+  def initialize(account, waba_info, phone_info, access_token, coexistence: false)
     @account = account
     @waba_info = waba_info
     @phone_info = phone_info
     @access_token = access_token
+    @coexistence = coexistence
   end
 
   def perform
@@ -48,12 +49,16 @@ class Whatsapp::ChannelCreationService
   end
 
   def build_provider_config
-    {
+    config = {
       api_key: @access_token,
       phone_number_id: @phone_info[:phone_number_id],
       business_account_id: @waba_info[:waba_id],
       source: 'embedded_signup'
     }
+    # Marks numbers onboarded through WhatsApp Business app coexistence, which must skip
+    # phone number registration on webhook setup.
+    config[:coexistence] = true if @coexistence
+    config
   end
 
   def create_inbox(channel)

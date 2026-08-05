@@ -39,6 +39,8 @@ export function useWhatsappEmbeddedSignup() {
 
       // Both the auth code and the business data arrive asynchronously and in
       // no fixed order; only resolve once we're holding both.
+      let isCoexistence = false;
+
       const resolveIfReady = () => {
         if (!authCode || !businessData) return;
         settle(resolve, {
@@ -46,6 +48,7 @@ export function useWhatsappEmbeddedSignup() {
           business_id: businessData.business_id,
           waba_id: businessData.waba_id,
           phone_number_id: businessData.phone_number_id || '',
+          coexistence: isCoexistence,
         });
       };
 
@@ -54,11 +57,20 @@ export function useWhatsappEmbeddedSignup() {
           data.event === 'FINISH' ||
           data.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING'
         ) {
+          // The two finalization events are mutually exclusive in a single
+          // signup run. Guard against a stray/duplicate second event
+          // overwriting the first one's businessData/isCoexistence (e.g. a
+          // coexistence FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING followed by a
+          // normal FINISH before authCode resolves), which would otherwise
+          // flip a coexistence onboarding into a regular one.
+          if (businessData) return;
           if (!isValidBusinessData(data.data)) {
             settle(reject, new Error('Invalid business data'));
             return;
           }
           businessData = data.data;
+          isCoexistence =
+            data.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING';
           resolveIfReady();
         } else if (data.event === 'CANCEL') {
           settle(resolve, null);

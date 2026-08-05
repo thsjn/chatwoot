@@ -1,8 +1,12 @@
 class Whatsapp::PhoneInfoService
-  def initialize(waba_id, phone_number_id, access_token)
+  # `strict` turns off the "just take the first number" fallbacks. Coexistence onboarding
+  # (FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING) returns no phone_number_id at all, so guessing there
+  # would silently connect the wrong number. The regular flow keeps the historical lenient behavior.
+  def initialize(waba_id, phone_number_id, access_token, strict: false)
     @waba_id = waba_id
     @phone_number_id = phone_number_id
     @access_token = access_token
+    @strict = strict
     @api_client = Whatsapp::FacebookApiClient.new(access_token)
   end
 
@@ -30,12 +34,29 @@ class Whatsapp::PhoneInfoService
 
   def find_phone_data(phone_numbers)
     return nil if phone_numbers.blank?
+    return find_phone_data_strict(phone_numbers) if @strict
+    return phone_numbers.find { |phone| phone['id'] == @phone_number_id } || phone_numbers.first if @phone_number_id.present?
 
-    if @phone_number_id.present?
-      phone_numbers.find { |phone| phone['id'] == @phone_number_id } || phone_numbers.first
-    else
-      phone_numbers.first
-    end
+    phone_numbers.first
+  end
+
+  # Strict mode never guesses: without an id the WABA must hold exactly one number, and an id that
+  # matches nothing is an error instead of a silent fallback to the first number.
+  def find_phone_data_strict(phone_numbers)
+    phone_data = if @phone_number_id.present?
+                   phone_numbers.find { |phone| phone['id'] == @phone_number_id }
+                 elsif phone_numbers.one?
+                   phone_numbers.first
+                 end
+
+    raise undetermined_phone_number_error(phone_numbers.size) if phone_data.nil?
+
+    phone_data
+  end
+
+  def undetermined_phone_number_error(phone_numbers_count)
+    "Unable to automatically determine the phone number to connect for WABA #{@waba_id}: #{phone_numbers_count} phone number(s) " \
+      'found on the WhatsApp Business Account. Inform the phone number explicitly and try again.'
   end
 
   def build_phone_info(phone_data)

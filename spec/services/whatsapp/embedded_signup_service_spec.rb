@@ -32,13 +32,12 @@ describe Whatsapp::EmbeddedSignupService do
       allow(token_exchange).to receive(:perform).and_return(access_token)
 
       phone_service = instance_double(Whatsapp::PhoneInfoService)
-      allow(Whatsapp::PhoneInfoService).to receive(:new)
-        .with(params[:waba_id], params[:phone_number_id], access_token).and_return(phone_service)
+      allow(Whatsapp::PhoneInfoService).to receive(:new).and_return(phone_service)
       allow(phone_service).to receive(:perform).and_return(phone_info)
 
       channel_creation = instance_double(Whatsapp::ChannelCreationService)
       allow(Whatsapp::ChannelCreationService).to receive(:new)
-        .with(account, { waba_id: params[:waba_id], business_name: 'Test Business' }, phone_info, access_token)
+        .with(account, { waba_id: params[:waba_id], business_name: 'Test Business' }, phone_info, access_token, coexistence: false)
         .and_return(channel_creation)
       allow(channel_creation).to receive(:perform).and_return(channel)
 
@@ -59,6 +58,14 @@ describe Whatsapp::EmbeddedSignupService do
 
       result = service.perform
       expect(result).to eq(channel)
+    end
+
+    # The regular flow must keep the lenient phone number resolution it always had.
+    it 'looks up the phone info without strict resolution' do
+      service.perform
+
+      expect(Whatsapp::PhoneInfoService).to have_received(:new)
+        .with(params[:waba_id], params[:phone_number_id], access_token, strict: false)
     end
 
     it 'checks health status after channel creation' do
@@ -108,6 +115,113 @@ describe Whatsapp::EmbeddedSignupService do
       it 'raises ArgumentError for missing parameters' do
         invalid_service = described_class.new(account: account, params: { code: '', business_id: '', waba_id: '' })
         expect { invalid_service.perform }.to raise_error(ArgumentError, /Required parameters are missing/)
+      end
+
+      it 'still requires code and waba_id but not business_id' do
+        invalid_service = described_class.new(account: account, params: { business_id: 'test_business_id' })
+        expect { invalid_service.perform }.to raise_error(ArgumentError, 'Required parameters are missing: code, waba_id')
+      end
+    end
+
+    context 'with coexistence onboarding' do
+      # FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING returns only the waba_id.
+      let(:params) { { code: 'test_authorization_code', waba_id: 'test_waba_id', coexistence: 'true' } }
+      let(:phone_info) do
+        {
+          phone_number_id: 'resolved_phone_number_id',
+          phone_number: '+1234567890',
+          verified: true,
+          business_name: 'Test Business'
+        }
+      end
+
+      it 'creates the channel flagged as coexistence' do
+        channel_creation = instance_double(Whatsapp::ChannelCreationService)
+        expect(Whatsapp::ChannelCreationService).to receive(:new).with(
+          account,
+          { waba_id: 'test_waba_id', business_name: 'Test Business' },
+          phone_info,
+          access_token,
+          coexistence: true
+        ).and_return(channel_creation)
+        allow(channel_creation).to receive(:perform).and_return(channel)
+
+        expect(service.perform).to eq(channel)
+      end
+
+      it 'resolves the phone number from the WABA when phone_number_id is absent' do
+        channel_creation = instance_double(Whatsapp::ChannelCreationService)
+        allow(Whatsapp::ChannelCreationService).to receive(:new).and_return(channel_creation)
+        allow(channel_creation).to receive(:perform).and_return(channel)
+
+        service.perform
+
+        expect(Whatsapp::PhoneInfoService).to have_received(:new).with('test_waba_id', nil, access_token, strict: true)
+      end
+    end
+
+    # The coexistence flag must already be persisted on the channel by the time setup_webhooks runs,
+    # otherwise WebhookSetupService would call /register and break the coexistence link.
+    context 'with coexistence onboarding on a real channel' do
+      let(:params) { { code: 'test_authorization_code', waba_id: 'test_waba_id', coexistence: 'true' } }
+      let(:phone_info) do
+        {
+          phone_number_id: 'resolved_phone_number_id',
+          phone_number: '+1234567890',
+          verified: true,
+          business_name: 'Test Business'
+        }
+      end
+      let(:api_client) { instance_double(Whatsapp::FacebookApiClient) }
+
+      before do
+        allow(Whatsapp::FacebookApiClient).to receive(:new).and_return(api_client)
+        allow(api_client).to receive(:phone_number_verified?).and_return(false)
+        allow(api_client).to receive(:register_phone_number)
+        allow(api_client).to receive(:subscribe_phone_number_webhook).and_return({ 'success' => true })
+
+        # Let the real ChannelCreationService run so the persisted provider_config is exercised.
+        allow(Whatsapp::ChannelCreationService).to receive(:new).and_call_original
+        allow(Channel::Whatsapp).to receive(:new).and_wrap_original do |method, *args|
+          created = method.call(*args)
+          allow(created).to receive(:validate_provider_config)
+          allow(created).to receive(:sync_templates)
+          created
+        end
+      end
+
+      it 'persists the coexistence flag before webhook setup, so the phone number is never registered' do
+        created_channel = service.perform
+
+        expect(created_channel.provider_config['coexistence']).to be(true)
+        expect(api_client).not_to have_received(:register_phone_number)
+        expect(api_client).to have_received(:subscribe_phone_number_webhook)
+      end
+    end
+
+    # Reauth/reconfiguration popups frequently post an empty phone_number_id even though the
+    # inbox already knows which number it is bound to.
+    context 'when reauthorization omits phone_number_id' do
+      let(:params) { { code: 'test_authorization_code', waba_id: 'test_waba_id', phone_number_id: '' } }
+      let(:existing_channel) do
+        create(:channel_whatsapp, account: account, provider: 'whatsapp_cloud', phone_number: '+1234567890',
+                                  validate_provider_config: false, sync_templates: false)
+      end
+      let(:service_with_inbox) { described_class.new(account: account, params: params, inbox_id: existing_channel.inbox.id) }
+
+      before do
+        existing_channel.update!(provider_config: existing_channel.provider_config.merge('phone_number_id' => 'persisted_phone_id'))
+
+        reauth_service = instance_double(Whatsapp::ReauthorizationService)
+        allow(Whatsapp::ReauthorizationService).to receive(:new).and_return(reauth_service)
+        allow(reauth_service).to receive(:perform).and_return(existing_channel)
+        allow(existing_channel).to receive(:setup_webhooks)
+      end
+
+      it 'falls back to the phone_number_id persisted on the channel' do
+        service_with_inbox.perform
+
+        expect(Whatsapp::PhoneInfoService).to have_received(:new).with('test_waba_id', 'persisted_phone_id', access_token, strict: false)
       end
     end
 
@@ -236,7 +350,8 @@ describe Whatsapp::EmbeddedSignupService do
           account: account,
           inbox_id: inbox_id,
           phone_number_id: params[:phone_number_id],
-          waba_id: params[:waba_id]
+          waba_id: params[:waba_id],
+          coexistence: false
         ).and_return(reauth_service)
         allow(reauth_service).to receive(:perform).with(access_token, phone_info).and_return(channel)
 
@@ -294,7 +409,8 @@ describe Whatsapp::EmbeddedSignupService do
             account: account,
             inbox_id: inbox.id,
             phone_number_id: params[:phone_number_id],
-            waba_id: params[:waba_id]
+            waba_id: params[:waba_id],
+            coexistence: false
           ).and_return(reauth_service)
 
           allow(reauth_service).to receive(:perform) do

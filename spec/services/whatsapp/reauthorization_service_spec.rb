@@ -67,6 +67,27 @@ describe Whatsapp::ReauthorizationService do
       expect(inbox.reload.name).to eq('New Business Name')
     end
 
+    it 'does not flag the channel as coexistence by default' do
+      service.perform(access_token, phone_info)
+      expect(channel.reload.provider_config).not_to have_key('coexistence')
+    end
+
+    it 'flags the channel as coexistence when requested' do
+      coexistence_service = described_class.new(
+        account: account,
+        inbox_id: inbox.id,
+        phone_number_id: nil,
+        waba_id: 'new_waba_id',
+        coexistence: true
+      )
+      coexistence_service.perform(access_token, phone_info)
+
+      reloaded_config = channel.reload.provider_config
+      expect(reloaded_config['coexistence']).to be(true)
+      # Falls back to the phone_number_id resolved from the WABA.
+      expect(reloaded_config['phone_number_id']).to eq('new_phone_number_id')
+    end
+
     it 'raises when the phone number does not match' do
       mismatched_phone_info = phone_info.merge(phone_number: '+0987654321')
       expect { service.perform(access_token, mismatched_phone_info) }

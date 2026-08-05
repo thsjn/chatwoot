@@ -30,17 +30,66 @@ RSpec.describe 'WhatsApp Authorization API', type: :request do
           expect(response.parsed_body['error']).to include('code')
         end
 
-        it 'returns unprocessable entity when business_id is missing' do
+        # The coexistence flow (FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING) returns only waba_id.
+        it 'does not require business_id' do
+          whatsapp_channel = create(:channel_whatsapp, account: account, validate_provider_config: false, sync_templates: false)
+          inbox = create(:inbox, account: account, channel: whatsapp_channel)
+          embedded_signup_service = instance_double(Whatsapp::EmbeddedSignupService)
+
+          expect(Whatsapp::EmbeddedSignupService).to receive(:new).with(
+            account: account,
+            params: {
+              code: 'test_code',
+              waba_id: 'test_waba_id',
+              coexistence: true
+            },
+            inbox_id: nil
+          ).and_return(embedded_signup_service)
+
+          allow(embedded_signup_service).to receive(:perform).and_return(whatsapp_channel)
+          allow(whatsapp_channel).to receive(:inbox).and_return(inbox)
+
           post "/api/v1/accounts/#{account.id}/whatsapp/authorization",
                params: {
                  code: 'test_code',
-                 waba_id: 'test_waba_id'
+                 waba_id: 'test_waba_id',
+                 coexistence: true
                },
                headers: agent.create_new_auth_token,
                as: :json
 
-          expect(response).to have_http_status(:unprocessable_entity)
-          expect(response.parsed_body['error']).to include('business_id')
+          expect(response).to have_http_status(:success)
+        end
+
+        # The regular embedded signup flow may also omit business_id: only code and waba_id are required.
+        it 'does not require business_id outside the coexistence flow' do
+          whatsapp_channel = create(:channel_whatsapp, account: account, validate_provider_config: false, sync_templates: false)
+          inbox = create(:inbox, account: account, channel: whatsapp_channel)
+          embedded_signup_service = instance_double(Whatsapp::EmbeddedSignupService)
+
+          expect(Whatsapp::EmbeddedSignupService).to receive(:new).with(
+            account: account,
+            params: {
+              code: 'test_code',
+              waba_id: 'test_waba_id',
+              phone_number_id: 'test_phone_id'
+            },
+            inbox_id: nil
+          ).and_return(embedded_signup_service)
+
+          allow(embedded_signup_service).to receive(:perform).and_return(whatsapp_channel)
+          allow(whatsapp_channel).to receive(:inbox).and_return(inbox)
+
+          post "/api/v1/accounts/#{account.id}/whatsapp/authorization",
+               params: {
+                 code: 'test_code',
+                 waba_id: 'test_waba_id',
+                 phone_number_id: 'test_phone_id'
+               },
+               headers: agent.create_new_auth_token,
+               as: :json
+
+          expect(response).to have_http_status(:success)
         end
 
         it 'returns unprocessable entity when waba_id is missing' do

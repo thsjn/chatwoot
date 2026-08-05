@@ -5,15 +5,18 @@ import {
   createMessageHandler,
 } from 'dashboard/routes/dashboard/settings/inbox/channels/whatsapp/utils';
 
+// The whole module is mocked so these tests can drive FB.login()/postMessage
+// timing without touching the real SDK plumbing. isValidBusinessData is
+// re-implemented here only to keep the mocked "invalid data" scenario
+// exercisable; the real implementation is covered on its own in
+// routes/.../whatsapp/specs/utils.spec.js.
 vi.mock(
   'dashboard/routes/dashboard/settings/inbox/channels/whatsapp/utils',
   () => ({
     setupFacebookSdk: vi.fn(),
     initWhatsAppEmbeddedSignup: vi.fn(),
     createMessageHandler: vi.fn(),
-    isValidBusinessData: vi.fn(data =>
-      Boolean(data && data.business_id && data.waba_id)
-    ),
+    isValidBusinessData: vi.fn(data => Boolean(data && data.waba_id)),
   })
 );
 
@@ -79,6 +82,7 @@ describe('useWhatsappEmbeddedSignup', () => {
       business_id: 'biz-1',
       waba_id: 'waba-1',
       phone_number_id: 'phone-1',
+      coexistence: false,
     });
     expect(setupFacebookSdk).toHaveBeenCalledWith('app-id', 'v22.0');
     expect(initWhatsAppEmbeddedSignup).toHaveBeenCalledWith('config-id');
@@ -103,6 +107,28 @@ describe('useWhatsappEmbeddedSignup', () => {
       business_id: 'biz-1',
       waba_id: 'waba-1',
       phone_number_id: 'phone-1',
+      coexistence: true,
+    });
+  });
+
+  it('resolves with coexistence: true and no business_id/phone_number_id for a coexistence-only payload', async () => {
+    initWhatsAppEmbeddedSignup.mockResolvedValue('auth-code');
+
+    const { runEmbeddedSignup } = useWhatsappEmbeddedSignup();
+    const result = runEmbeddedSignup();
+
+    await flushPromises();
+    emit({
+      event: 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING',
+      data: { waba_id: 'waba-1' },
+    });
+
+    await expect(result).resolves.toEqual({
+      code: 'auth-code',
+      business_id: undefined,
+      waba_id: 'waba-1',
+      phone_number_id: '',
+      coexistence: true,
     });
   });
 
@@ -149,6 +175,36 @@ describe('useWhatsappEmbeddedSignup', () => {
     emit({ event: 'error', error_message: 'WABA not eligible' });
 
     await expect(result).rejects.toThrow('WABA not eligible');
+  });
+
+  it('ignores a second finalization event once the first has been recorded', async () => {
+    const code = createDeferred();
+    initWhatsAppEmbeddedSignup.mockReturnValue(code.promise);
+
+    const { runEmbeddedSignup } = useWhatsappEmbeddedSignup();
+    const result = runEmbeddedSignup();
+
+    // Coexistence event arrives first...
+    emit({
+      event: 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING',
+      data: VALID_BUSINESS,
+    });
+    // ...then a (stray/duplicate) normal FINISH arrives before authCode
+    // resolves. It must not overwrite the already-recorded businessData or
+    // flip isCoexistence back to false.
+    emit({
+      event: 'FINISH',
+      data: { ...VALID_BUSINESS, waba_id: 'waba-2' },
+    });
+    code.resolve('late-code');
+
+    await expect(result).resolves.toEqual({
+      code: 'late-code',
+      business_id: 'biz-1',
+      waba_id: 'waba-1',
+      phone_number_id: 'phone-1',
+      coexistence: true,
+    });
   });
 
   it('rejects when the business data is invalid', async () => {

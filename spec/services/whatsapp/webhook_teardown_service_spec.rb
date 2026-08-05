@@ -52,6 +52,50 @@ RSpec.describe Whatsapp::WebhookTeardownService do
       end
     end
 
+    # Coexistence numbers stay live on the customer's WhatsApp Business app, so deregistering would
+    # take the number down there — the mirror image of the /register call skipped on setup.
+    context 'when channel is whatsapp_cloud onboarded through coexistence' do
+      before do
+        allow(channel).to receive(:setup_webhooks).and_return(true)
+
+        channel.update!(
+          provider: 'whatsapp_cloud',
+          provider_config: {
+            'source' => 'embedded_signup',
+            'phone_number_id' => 'coexistence_phone_id',
+            'business_account_id' => 'coexistence_waba_id',
+            'api_key' => 'test_api_key',
+            'coexistence' => true
+          }
+        )
+      end
+
+      it 'does not deregister the phone number' do
+        api_client = instance_double(Whatsapp::FacebookApiClient)
+        allow(Whatsapp::FacebookApiClient).to receive(:new).with('test_api_key').and_return(api_client)
+        allow(api_client).to receive(:clear_phone_number_callback_override)
+        allow(api_client).to receive(:deregister_phone_number)
+        allow(api_client).to receive(:unsubscribe_app_from_waba)
+
+        service.perform
+
+        expect(api_client).not_to have_received(:deregister_phone_number)
+      end
+
+      it 'still clears the callback override and unsubscribes the app from the WABA' do
+        api_client = instance_double(Whatsapp::FacebookApiClient)
+        allow(Whatsapp::FacebookApiClient).to receive(:new).with('test_api_key').and_return(api_client)
+        allow(api_client).to receive(:clear_phone_number_callback_override)
+        allow(api_client).to receive(:deregister_phone_number)
+        allow(api_client).to receive(:unsubscribe_app_from_waba)
+
+        service.perform
+
+        expect(api_client).to have_received(:clear_phone_number_callback_override).with('coexistence_phone_id')
+        expect(api_client).to have_received(:unsubscribe_app_from_waba).with('coexistence_waba_id')
+      end
+    end
+
     context 'when channel is not whatsapp_cloud' do
       before do
         channel.update!(provider: 'default')

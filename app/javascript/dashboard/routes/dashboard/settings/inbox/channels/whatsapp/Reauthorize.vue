@@ -73,15 +73,24 @@ const handleEmbeddedSignupEvents = async (data, authCode) => {
   }
 
   // Handle different event types
-  if (data.event === 'FINISH') {
+  if (
+    data.event === 'FINISH' ||
+    data.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING'
+  ) {
     const businessData = data.data;
 
-    if (isValidBusinessData(businessData) && businessData.phone_number_id) {
+    if (isValidBusinessData(businessData)) {
+      const isCoexistence =
+        data.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING';
+
       await reauthorizeWhatsApp({
         code: authCode,
         business_id: businessData.business_id,
         waba_id: businessData.waba_id,
-        phone_number_id: businessData.phone_number_id,
+        ...(businessData.phone_number_id
+          ? { phone_number_id: businessData.phone_number_id }
+          : {}),
+        ...(isCoexistence ? { coexistence: true } : {}),
       });
     } else {
       useAlert(

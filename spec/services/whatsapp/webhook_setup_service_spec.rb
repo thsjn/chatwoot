@@ -82,6 +82,38 @@ describe Whatsapp::WebhookSetupService do
       end
     end
 
+    context 'when the channel was onboarded through coexistence' do
+      let(:channel) do
+        create(:channel_whatsapp,
+               phone_number: '+1234567890',
+               provider_config: {
+                 'phone_number_id' => '123456789',
+                 'webhook_verify_token' => 'test_verify_token',
+                 'source' => 'embedded_signup',
+                 'coexistence' => true
+               },
+               provider: 'whatsapp_cloud',
+               sync_templates: false,
+               validate_provider_config: false)
+      end
+
+      before do
+        allow(api_client).to receive(:phone_number_verified?).with('123456789').and_return(false)
+        allow(api_client).to receive(:register_phone_number)
+        allow(api_client).to receive(:subscribe_phone_number_webhook).and_return({ 'success' => true })
+      end
+
+      it 'does NOT register the phone number even when it looks unverified, but sets up webhook' do
+        with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+          expect(api_client).not_to receive(:register_phone_number)
+          expect(api_client).to receive(:subscribe_phone_number_webhook)
+            .with(waba_id, '123456789', 'https://app.chatwoot.com/webhooks/whatsapp/+1234567890', 'test_verify_token',
+                  subscribed_fields: %w[messages smb_message_echoes])
+          service.perform
+        end
+      end
+    end
+
     context 'when phone number IS verified BUT needs registration (pending provisioning)' do
       before do
         allow(api_client).to receive(:phone_number_verified?).with('123456789').and_return(true)

@@ -30,7 +30,7 @@ export const initializeFacebook = (appId, apiVersion) => {
 };
 
 export const isValidBusinessData = businessData => {
-  return businessData && businessData.business_id && businessData.waba_id;
+  return Boolean(businessData && businessData.waba_id);
 };
 
 export const createMessageHandler = onEmbeddedSignupData => {

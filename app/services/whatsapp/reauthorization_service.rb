@@ -1,9 +1,10 @@
 class Whatsapp::ReauthorizationService
-  def initialize(account:, inbox_id:, phone_number_id:, waba_id:)
+  def initialize(account:, inbox_id:, phone_number_id:, waba_id:, coexistence: false)
     @account = account
     @inbox_id = inbox_id
     @phone_number_id = phone_number_id
     @waba_id = waba_id
+    @coexistence = coexistence
   end
 
   def perform(access_token, phone_info)
@@ -30,12 +31,17 @@ class Whatsapp::ReauthorizationService
     # Legacy clients may omit phone_number_id; fall back to the value just fetched from Meta.
     resolved_phone_number_id = @phone_number_id.presence || phone_info[:phone_number_id]
 
-    channel.provider_config = current_config.merge(
+    new_config = current_config.merge(
       'api_key' => access_token,
       'phone_number_id' => resolved_phone_number_id,
       'business_account_id' => @waba_id,
       'source' => 'embedded_signup'
     )
+    # Marks numbers onboarded through WhatsApp Business app coexistence, which must skip
+    # phone number registration on webhook setup.
+    new_config['coexistence'] = true if @coexistence
+
+    channel.provider_config = new_config
     channel.save!
 
     # Update inbox name if business name changed

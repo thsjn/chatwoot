@@ -53,6 +53,11 @@ describe Whatsapp::ChannelCreationService do
         expect(channel.provider_config['source']).to eq('embedded_signup')
       end
 
+      it 'does not flag the channel as coexistence by default' do
+        channel = service.perform
+        expect(channel.provider_config).not_to have_key('coexistence')
+      end
+
       it 'creates an inbox for the channel' do
         channel = service.perform
         inbox = channel.inbox
@@ -70,6 +75,16 @@ describe Whatsapp::ChannelCreationService do
         expect do
           expect { service.perform }.to raise_error(ActiveRecord::RecordInvalid)
         end.not_to change(Channel::Whatsapp, :count)
+      end
+    end
+
+    context 'when created through coexistence onboarding' do
+      let(:service) { described_class.new(account, waba_info, phone_info, access_token, coexistence: true) }
+
+      it 'flags the channel as coexistence' do
+        channel = service.perform
+        expect(channel.provider_config['coexistence']).to be(true)
+        expect(channel.provider_config['source']).to eq('embedded_signup')
       end
     end
 
