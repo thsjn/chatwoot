@@ -1,0 +1,143 @@
+name: Testes WhatsApp
+
+# Mesmo raciocinio do test-crm.yml: o workflow do upstream (run_foss_spec.yml)
+# roda em runners `blacksmith-*` self-hosted que nao existem neste fork. Este
+# workflow usa runners publicos e roda so os specs de WhatsApp/Coexistence,
+# para dar feedback rapido. Como nao ha Ruby na maquina de desenvolvimento,
+# ESTE E o ambiente de validacao do codigo backend.
+#
+# Fica em arquivo separado do test-crm.yml de proposito: uma quebra em
+# WhatsApp nao deve se misturar com o sinal do CRM (e vice-versa).
+
+on:
+  push:
+    branches: [crm, coexistence-onboarding]
+    paths:
+      # Glob largo em vez de arquivo por arquivo — o test-crm.yml ja apanhou
+      # duas vezes por enumerar caminho a caminho e deixar algo real de fora.
+      - "app/services/whatsapp/**"
+      - "spec/services/whatsapp/**"
+      - "app/controllers/api/v1/accounts/whatsapp/**"
+      - "spec/controllers/api/v1/accounts/whatsapp/**"
+      - "app/javascript/dashboard/composables/*[Ww]hatsapp*"
+      - "app/javascript/dashboard/composables/spec/*[Ww]hatsapp*"
+      - "app/javascript/dashboard/routes/dashboard/settings/inbox/channels/whatsapp/**"
+      - ".github/workflows/test-whatsapp.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Roda os specs Vitest do modulo. Fica em job separado do backend porque nao
+  # precisa de Postgres nem Redis: sobe bem mais rapido que o backend.
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm i
+
+      - name: Specs do front do WhatsApp
+        run: |
+          paths=()
+          for target in app/javascript/dashboard/composables/spec/useWhatsappEmbeddedSignup.spec.js \
+                        app/javascript/dashboard/routes/dashboard/settings/inbox/channels/whatsapp/specs; do
+            if [ -e "$target" ]; then
+              paths+=("$target")
+            fi
+          done
+          if [ ${#paths[@]} -eq 0 ]; then
+            echo "Nenhum spec de front do WhatsApp ainda — nada a rodar."
+          else
+            TZ=UTC npx vitest run --no-coverage "${paths[@]}"
+          fi
+        shell: bash
+
+  backend:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ""
+          POSTGRES_DB: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+        options: --entrypoint redis-server
+
+    env:
+      RAILS_ENV: test
+      POSTGRES_HOST: localhost
+      POSTGRES_USERNAME: postgres
+      POSTGRES_PASSWORD: ""
+      REDIS_URL: redis://localhost:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Instalar dependencias do front
+        run: pnpm i
+
+      # Mesmo strip do build: o diretorio esta sob licenca comercial.
+      - name: Remover codigo enterprise
+        run: |
+          rm -rf enterprise
+          rm -rf spec/enterprise
+
+      # Sem migration nova neste modulo (diferente do CRM) — schema:load ja
+      # deixa o banco no estado que os specs esperam, sem passo extra de migrate.
+      - name: Preparar banco
+        run: |
+          bundle exec rake db:create
+          bundle exec rake db:schema:load
+
+      - name: Specs do WhatsApp
+        run: |
+          # Diretorios inteiros (nao so os arquivos tocados nesta mudanca), para
+          # pegar regressao em specs pre-existentes de WhatsApp tambem. Precisa de
+          # globstar porque spec/services/whatsapp tem specs em subpastas
+          # (baileys, providers, zapi_handlers...) e "**" sem essa opcao vira "*"
+          # e so casa um nivel — deixaria escapar tanto os specs de 1 nivel
+          # quanto os de 2, dependendo do diretorio.
+          shopt -s globstar
+          paths=()
+          for dir in spec/services/whatsapp spec/controllers/api/v1/accounts/whatsapp; do
+            if compgen -G "$dir/**/*_spec.rb" > /dev/null; then
+              paths+=("$dir")
+            fi
+          done
+          if [ ${#paths[@]} -eq 0 ]; then
+            echo "Nenhum spec de WhatsApp ainda — nada a rodar."
+          else
+            bundle exec rspec "${paths[@]}" --format progress
+          fi
+        shell: bash
